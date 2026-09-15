@@ -11,9 +11,9 @@ from __future__ import annotations
 import json
 import subprocess
 import time
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Dict, Iterator
 from unittest.mock import patch
 
 import pytest
@@ -24,10 +24,12 @@ from dep_gate import cli
 @contextmanager
 def _patched_osv(batch_result: dict, hydrate_result: dict) -> Iterator[None]:
     """Patch the osv_client boundary only, per TechSpec.md's network-boundary rule."""
-    with patch.object(cli.osv_client, "batch_query", return_value=batch_result), patch.object(
-        cli.osv_client, "hydrate_vulns", return_value=hydrate_result
+    with (
+        patch.object(cli.osv_client, "batch_query", return_value=batch_result),
+        patch.object(cli.osv_client, "hydrate_vulns", return_value=hydrate_result),
     ):
         yield
+
 
 HIGH_VULN_RECORD = {
     "id": "GHSA-high-0001",
@@ -53,7 +55,7 @@ LOW_VULN_RECORD = {
 }
 
 
-def _write_npm_lockfile(path: Path, deps: Dict[str, str]) -> None:
+def _write_npm_lockfile(path: Path, deps: dict[str, str]) -> None:
     packages = {"": {"name": "sample", "version": "1.0.0"}}
     for name, version in deps.items():
         packages[f"node_modules/{name}"] = {"version": version}
@@ -68,8 +70,9 @@ def lockfile(tmp_path: Path) -> Path:
 
 
 def test_run_passing_scan_exits_0_no_vulns(lockfile: Path) -> None:
-    with patch.object(cli.osv_client, "batch_query", return_value={}), patch.object(
-        cli.osv_client, "hydrate_vulns", return_value={}
+    with (
+        patch.object(cli.osv_client, "batch_query", return_value={}),
+        patch.object(cli.osv_client, "hydrate_vulns", return_value={}),
     ):
         exit_code = cli.run(["--file", str(lockfile)])
 
@@ -134,8 +137,9 @@ def test_run_api_failure_with_fail_open_exits_0(lockfile: Path) -> None:
 def test_run_hydrate_failure_also_respects_fail_open(lockfile: Path) -> None:
     key = "npm/lodash@4.17.15"
     batch_result = {key: {"GHSA-high-0001"}}
-    with patch.object(cli.osv_client, "batch_query", return_value=batch_result), patch.object(
-        cli.osv_client, "hydrate_vulns", side_effect=RuntimeError("OSV down")
+    with (
+        patch.object(cli.osv_client, "batch_query", return_value=batch_result),
+        patch.object(cli.osv_client, "hydrate_vulns", side_effect=RuntimeError("OSV down")),
     ):
         exit_code = cli.run(["--file", str(lockfile), "--fail-open"])
 
@@ -244,17 +248,23 @@ def test_run_pr_comment_posts_and_does_not_change_exit_code(
 ) -> None:
     monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
     key = "npm/lodash@4.17.15"
-    with _patched_osv({key: {"GHSA-high-0001"}}, {"GHSA-high-0001": HIGH_VULN_RECORD}):
-        with patch.object(cli.github_client, "upsert_comment") as mock_upsert:
-            exit_code = cli.run(
-                [
-                    "--file", str(lockfile),
-                    "--fail-on", "high",
-                    "--pr-comment",
-                    "--github-repo", "owner/repo",
-                    "--github-pr-number", "7",
-                ]
-            )
+    with (
+        _patched_osv({key: {"GHSA-high-0001"}}, {"GHSA-high-0001": HIGH_VULN_RECORD}),
+        patch.object(cli.github_client, "upsert_comment") as mock_upsert,
+    ):
+        exit_code = cli.run(
+            [
+                "--file",
+                str(lockfile),
+                "--fail-on",
+                "high",
+                "--pr-comment",
+                "--github-repo",
+                "owner/repo",
+                "--github-pr-number",
+                "7",
+            ]
+        )
 
     assert exit_code == 1  # unchanged from the non-pr-comment scenario
     mock_upsert.assert_called_once()
@@ -270,26 +280,34 @@ def test_run_pr_comment_posting_failure_does_not_change_exit_code(
 ) -> None:
     monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
     key = "npm/lodash@4.17.15"
-    with _patched_osv({key: {"GHSA-high-0001"}}, {"GHSA-high-0001": HIGH_VULN_RECORD}):
-        with patch.object(cli.github_client, "upsert_comment", side_effect=RuntimeError("boom")):
-            exit_code = cli.run(
-                [
-                    "--file", str(lockfile),
-                    "--fail-on", "high",
-                    "--pr-comment",
-                    "--github-repo", "owner/repo",
-                    "--github-pr-number", "7",
-                ]
-            )
+    with (
+        _patched_osv({key: {"GHSA-high-0001"}}, {"GHSA-high-0001": HIGH_VULN_RECORD}),
+        patch.object(cli.github_client, "upsert_comment", side_effect=RuntimeError("boom")),
+    ):
+        exit_code = cli.run(
+            [
+                "--file",
+                str(lockfile),
+                "--fail-on",
+                "high",
+                "--pr-comment",
+                "--github-repo",
+                "owner/repo",
+                "--github-pr-number",
+                "7",
+            ]
+        )
 
     assert exit_code == 1  # a posting failure never flips the security-relevant result
 
 
 def test_run_without_pr_comment_never_touches_github_client(lockfile: Path) -> None:
     key = "npm/lodash@4.17.15"
-    with _patched_osv({key: {"GHSA-high-0001"}}, {"GHSA-high-0001": HIGH_VULN_RECORD}):
-        with patch.object(cli.github_client, "upsert_comment") as mock_upsert:
-            cli.run(["--file", str(lockfile), "--fail-on", "high"])
+    with (
+        _patched_osv({key: {"GHSA-high-0001"}}, {"GHSA-high-0001": HIGH_VULN_RECORD}),
+        patch.object(cli.github_client, "upsert_comment") as mock_upsert,
+    ):
+        cli.run(["--file", str(lockfile), "--fail-on", "high"])
 
     mock_upsert.assert_not_called()
 
@@ -307,19 +325,19 @@ def test_run_cache_file_skips_fetching_fresh_cached_id(lockfile: Path, tmp_path:
         hydrate_calls.append(set(vuln_ids))
         return {}
 
-    with patch.object(cli.osv_client, "batch_query", return_value={key: {"GHSA-high-0001"}}):
-        with patch.object(cli.osv_client, "hydrate_vulns", side_effect=_fake_hydrate):
-            exit_code = cli.run(
-                ["--file", str(lockfile), "--fail-on", "high", "--cache-file", str(cache_file)]
-            )
+    with (
+        patch.object(cli.osv_client, "batch_query", return_value={key: {"GHSA-high-0001"}}),
+        patch.object(cli.osv_client, "hydrate_vulns", side_effect=_fake_hydrate),
+    ):
+        exit_code = cli.run(
+            ["--file", str(lockfile), "--fail-on", "high", "--cache-file", str(cache_file)]
+        )
 
     assert hydrate_calls == []  # fresh cache hit - no network call for this id at all
     assert exit_code == 1  # still correctly evaluated from the cached record
 
 
-def test_run_cache_file_fetches_uncached_id_and_persists_it(
-    lockfile: Path, tmp_path: Path
-) -> None:
+def test_run_cache_file_fetches_uncached_id_and_persists_it(lockfile: Path, tmp_path: Path) -> None:
     cache_file = tmp_path / "cache.json"
     key = "npm/lodash@4.17.15"
     with _patched_osv({key: {"GHSA-high-0001"}}, {"GHSA-high-0001": HIGH_VULN_RECORD}):
@@ -402,9 +420,7 @@ def test_run_ignore_file_suppresses_matching_finding(lockfile: Path, tmp_path: P
 def test_run_ignore_file_expired_entry_still_blocks(lockfile: Path, tmp_path: Path) -> None:
     ignore_file = tmp_path / ".dep-gate-ignore.yml"
     ignore_file.write_text(
-        "- vuln_id: GHSA-high-0001\n"
-        "  expires: 2000-01-01\n"
-        '  reason: "expired long ago"\n',
+        "- vuln_id: GHSA-high-0001\n" "  expires: 2000-01-01\n" '  reason: "expired long ago"\n',
         encoding="utf-8",
     )
     key = "npm/lodash@4.17.15"
@@ -519,9 +535,13 @@ def test_run_sbom_respects_diff_only(tmp_path: Path, monkeypatch: pytest.MonkeyP
     with _patched_osv({}, {}):
         cli.run(
             [
-                "--file", "package-lock.json",
-                "--diff-only", "--base-ref", "HEAD~1",
-                "--sbom", str(sbom_path),
+                "--file",
+                "package-lock.json",
+                "--diff-only",
+                "--base-ref",
+                "HEAD~1",
+                "--sbom",
+                str(sbom_path),
             ]
         )
 
@@ -653,12 +673,11 @@ def test_run_diff_only_scans_only_changed_deps(
         captured["deps"] = deps
         return {}
 
-    with patch.object(cli.osv_client, "batch_query", side_effect=_fake_batch_query), patch.object(
-        cli.osv_client, "hydrate_vulns", return_value={}
+    with (
+        patch.object(cli.osv_client, "batch_query", side_effect=_fake_batch_query),
+        patch.object(cli.osv_client, "hydrate_vulns", return_value={}),
     ):
-        exit_code = cli.run(
-            ["--file", "package-lock.json", "--diff-only", "--base-ref", "HEAD~1"]
-        )
+        exit_code = cli.run(["--file", "package-lock.json", "--diff-only", "--base-ref", "HEAD~1"])
 
     assert exit_code == 0
     assert [d["name"] for d in captured["deps"]] == ["left-pad"]

@@ -18,12 +18,11 @@ either way, so `CACHE_TTL_SECONDS` is deliberately short.
 from __future__ import annotations
 
 import json
-from typing import Dict, Optional
 
 CACHE_TTL_SECONDS = 6 * 60 * 60  # 6 hours
 
 
-def load_cache(cache_path: str) -> Dict[str, dict]:
+def load_cache(cache_path: str) -> dict[str, dict]:
     """
     Load the cache file. Returns `{}` if it doesn't exist (first run) or
     is unreadable/corrupt - a broken cache file must never take down the
@@ -37,13 +36,13 @@ def load_cache(cache_path: str) -> Dict[str, dict]:
     return data if isinstance(data, dict) else {}
 
 
-def save_cache(cache_path: str, cache: Dict[str, dict]) -> None:
+def save_cache(cache_path: str, cache: dict[str, dict]) -> None:
     """Write the cache file."""
     with open(cache_path, "w", encoding="utf-8") as f:
         json.dump(cache, f)
 
 
-def get_fresh(cache: Dict[str, dict], vuln_id: str, now: float) -> Optional[dict]:
+def get_fresh(cache: dict[str, dict], vuln_id: str, now: float) -> dict | None:
     """Return the cached hydrated record for `vuln_id` if still within TTL, else None."""
     entry = cache.get(vuln_id)
     if entry is None:
@@ -53,6 +52,6 @@ def get_fresh(cache: Dict[str, dict], vuln_id: str, now: float) -> Optional[dict
     return entry["record"]
 
 
-def put(cache: Dict[str, dict], vuln_id: str, record: dict, now: float) -> None:
+def put(cache: dict[str, dict], vuln_id: str, record: dict, now: float) -> None:
     """Store a freshly-fetched hydrated record in `cache` (mutated in place)."""
     cache[vuln_id] = {"record": record, "cached_at": now}

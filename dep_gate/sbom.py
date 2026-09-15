@@ -13,15 +13,13 @@ so a graph here would just be fabricated.
 
 from __future__ import annotations
 
-from typing import Dict, List
-
 from .lockfile import Dependency
 
 CYCLONEDX_SPEC_VERSION = "1.5"
 
 # OSV's ecosystem strings don't always match purl's "type" component
 # (https://github.com/package-url/purl-spec) - PyPI/Go/crates.io differ.
-_PURL_TYPE_BY_ECOSYSTEM: Dict[str, str] = {
+_PURL_TYPE_BY_ECOSYSTEM: dict[str, str] = {
     "npm": "npm",
     "PyPI": "pypi",
     "Go": "golang",
@@ -34,7 +32,7 @@ def _purl(dep: Dependency) -> str:
     return f"pkg:{purl_type}/{dep['name']}@{dep['version']}"
 
 
-def build_sbom(dependencies: List[Dependency]) -> dict:
+def build_sbom(dependencies: list[Dependency]) -> dict:
     """Build a CycloneDX document (as a plain dict, ready for json.dump)."""
     return {
         "bomFormat": "CycloneDX",

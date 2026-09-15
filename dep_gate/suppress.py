@@ -22,12 +22,12 @@ dependency for a single fixed-shape config file.
 from __future__ import annotations
 
 import datetime
-from typing import List, NamedTuple, Optional
+from typing import NamedTuple
 
 
 class Suppression(NamedTuple):
     vuln_id: str
-    package: Optional[str]  # None means "suppress this vuln_id for any package"
+    package: str | None  # None means "suppress this vuln_id for any package"
     expires: str  # YYYY-MM-DD, validated at load time
     reason: str
 
@@ -41,7 +41,7 @@ def _strip_quotes(value: str) -> str:
     return value
 
 
-def load_suppressions(filepath: str) -> List[Suppression]:
+def load_suppressions(filepath: str) -> list[Suppression]:
     """
     Parse a `.dep-gate-ignore.yml` file into a list of `Suppression`
     entries. Raises `ValueError` (not a silent skip) if an entry is
@@ -52,8 +52,8 @@ def load_suppressions(filepath: str) -> List[Suppression]:
     with open(filepath, "r", encoding="utf-8") as f:
         lines = f.readlines()
 
-    entries: List[dict] = []
-    current: Optional[dict] = None
+    entries: list[dict] = []
+    current: dict | None = None
 
     for raw_line in lines:
         line = raw_line.rstrip("\n")
@@ -79,7 +79,7 @@ def load_suppressions(filepath: str) -> List[Suppression]:
         key, _, value = stripped.partition(":")
         current[key.strip()] = _strip_quotes(value.strip())
 
-    suppressions: List[Suppression] = []
+    suppressions: list[Suppression] = []
     for entry in entries:
         for field in _REQUIRED_FIELDS:
             if not entry.get(field, "").strip():
@@ -112,18 +112,23 @@ def load_suppressions(filepath: str) -> List[Suppression]:
 def find_active_suppression(
     vuln_id: str,
     package: str,
-    suppressions: List[Suppression],
-    today: Optional[str] = None,
-) -> Optional[Suppression]:
+    suppressions: list[Suppression],
+    today: str | None = None,
+) -> Suppression | None:
     """
     Return the first non-expired suppression matching `vuln_id` (and
     scoped to `package`, or unscoped), or None. ISO 8601 dates sort
     lexicographically, so a plain string comparison against `today`
-    (defaulting to the real current date) is sufficient - no date-object
-    arithmetic needed. An entry is still active through the end of its
-    `expires` date (inclusive).
+    (defaulting to the real current UTC date) is sufficient - no
+    date-object arithmetic needed. An entry is still active through the
+    end of its `expires` date (inclusive).
+
+    `today` defaults to UTC, not the local system timezone: a suppression
+    expiring at a fixed calendar date must evaluate the same way whether
+    the tool runs on a developer's laptop or a CI runner, and those can
+    differ by a day right at the expiry boundary if tied to local time.
     """
-    today = today or datetime.date.today().isoformat()
+    today = today or datetime.datetime.now(datetime.timezone.utc).date().isoformat()
     for suppression in suppressions:
         if suppression.vuln_id != vuln_id:
             continue

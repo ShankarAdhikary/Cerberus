@@ -17,7 +17,6 @@ tool; a GitHub App adds infrastructure PRD.md's NFRs explicitly reject).
 from __future__ import annotations
 
 import time
-from typing import List, Optional
 
 import requests
 
@@ -70,11 +69,11 @@ def _request_with_retries(
 
 
 def render_pr_comment(
-    blocking: List[dict],
+    blocking: list[dict],
     scanned_count: int,
     fail_on: str,
     diff_mode: bool,
-    base_ref: Optional[str],
+    base_ref: str | None,
 ) -> str:
     """
     Render the Markdown PR comment body per Design.md §4. Pure function,
@@ -124,8 +123,8 @@ def render_pr_comment(
 
 
 def find_existing_comment_id(
-    repo: str, pr_number: int, token: str, session: Optional[requests.Session] = None
-) -> Optional[int]:
+    repo: str, pr_number: int, token: str, session: requests.Session | None = None
+) -> int | None:
     """Find our own bot comment on this PR (identified by COMMENT_MARKER), if any."""
     session = session or requests.Session()
     url = f"{API_BASE}/repos/{repo}/issues/{pr_number}/comments"
@@ -137,7 +136,7 @@ def find_existing_comment_id(
 
 
 def upsert_comment(
-    repo: str, pr_number: int, body: str, token: str, session: Optional[requests.Session] = None
+    repo: str, pr_number: int, body: str, token: str, session: requests.Session | None = None
 ) -> None:
     """Create the bot's findings comment on a PR, or update it in place if one already exists."""
     session = session or requests.Session()

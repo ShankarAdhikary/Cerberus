@@ -12,9 +12,10 @@ from __future__ import annotations
 
 import json
 import re
-import tomllib
 from pathlib import Path
-from typing import List, TypedDict
+from typing import TypedDict
+
+import tomllib
 
 
 class Dependency(TypedDict):
@@ -23,7 +24,7 @@ class Dependency(TypedDict):
     ecosystem: str
 
 
-def parse_npm_lockfile(filepath: str) -> List[Dependency]:
+def parse_npm_lockfile(filepath: str) -> list[Dependency]:
     """
     Parse npm lockfile v2/v3 format (the 'packages' key), which is what
     `npm install` has produced since npm 7+. Falls back to the legacy
@@ -32,7 +33,7 @@ def parse_npm_lockfile(filepath: str) -> List[Dependency]:
     with open(filepath, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    deps: List[Dependency] = []
+    deps: list[Dependency] = []
 
     if "packages" in data:
         for pkg_path, pkg_data in data["packages"].items():
@@ -56,7 +57,7 @@ def parse_npm_lockfile(filepath: str) -> List[Dependency]:
     return _dedupe(deps)
 
 
-def _walk_legacy_deps(dep_tree: dict, out: List[Dependency]) -> None:
+def _walk_legacy_deps(dep_tree: dict, out: list[Dependency]) -> None:
     """Recursively walk npm lockfile v1's nested 'dependencies' tree."""
     for name, meta in dep_tree.items():
         version = meta.get("version")
@@ -73,20 +74,20 @@ _REQ_LINE_RE = re.compile(
 )
 
 
-def parse_requirements_txt(filepath: str) -> List[Dependency]:
+def parse_requirements_txt(filepath: str) -> list[Dependency]:
     """
     Parse a pip 'requirements.txt' (ideally one produced by `pip freeze`
     or `pip-compile`, since only pinned '==' entries have a resolvable
     version). Unpinned or VCS/URL requirements are skipped with a note,
     since OSV needs an exact version to check.
     """
-    deps: List[Dependency] = []
-    skipped: List[str] = []
+    deps: list[Dependency] = []
+    skipped: list[str] = []
 
     with open(filepath, "r", encoding="utf-8") as f:
         for raw_line in f:
             line = raw_line.strip()
-            if not line or line.startswith("#") or line.startswith("-"):
+            if not line or line.startswith(("#", "-")):
                 continue
             match = _REQ_LINE_RE.match(line)
             if match:
@@ -98,14 +99,15 @@ def parse_requirements_txt(filepath: str) -> List[Dependency]:
     if skipped:
         print(
             f"Skipped {len(skipped)} unpinned/non-standard requirement line(s) "
-            "(no exact version to check): " + ", ".join(skipped[:5])
+            "(no exact version to check): "
+            + ", ".join(skipped[:5])
             + (" ..." if len(skipped) > 5 else "")
         )
 
     return _dedupe(deps)
 
 
-def parse_cargo_lock(filepath: str) -> List[Dependency]:
+def parse_cargo_lock(filepath: str) -> list[Dependency]:
     """
     Parse a Rust `Cargo.lock` (TOML) into a flat list of dependencies.
     Only `[[package]]` entries with a `registry+` `source` (crates.io) are
@@ -117,7 +119,7 @@ def parse_cargo_lock(filepath: str) -> List[Dependency]:
     with open(filepath, "rb") as f:
         data = tomllib.load(f)
 
-    deps: List[Dependency] = []
+    deps: list[Dependency] = []
     for pkg in data.get("package", []):
         name = pkg.get("name")
         version = pkg.get("version")
@@ -132,7 +134,7 @@ def parse_cargo_lock(filepath: str) -> List[Dependency]:
 _GO_MOD_SUFFIX = "/go.mod"
 
 
-def parse_go_sum(filepath: str) -> List[Dependency]:
+def parse_go_sum(filepath: str) -> list[Dependency]:
     """
     Parse a Go module `go.sum` file: lines of `module version[/go.mod] hash`.
     Each module normally appears twice - once for its content hash and once
@@ -142,7 +144,7 @@ def parse_go_sum(filepath: str) -> List[Dependency]:
     "/go.mod" row (no content hash needed for the build), and those still
     count as part of the module graph, so they aren't skipped.
     """
-    deps: List[Dependency] = []
+    deps: list[Dependency] = []
 
     with open(filepath, "r", encoding="utf-8") as f:
         for raw_line in f:
@@ -155,19 +157,15 @@ def parse_go_sum(filepath: str) -> List[Dependency]:
                 # consistent with how requirements.txt handles stray lines.
                 continue
             module, version_field, _hash = parts
-            version = (
-                version_field[: -len(_GO_MOD_SUFFIX)]
-                if version_field.endswith(_GO_MOD_SUFFIX)
-                else version_field
-            )
+            version = version_field.removesuffix(_GO_MOD_SUFFIX)
             deps.append({"name": module, "version": version, "ecosystem": "Go"})
 
     return _dedupe(deps)
 
 
-def _dedupe(deps: List[Dependency]) -> List[Dependency]:
+def _dedupe(deps: list[Dependency]) -> list[Dependency]:
     seen = set()
-    unique: List[Dependency] = []
+    unique: list[Dependency] = []
     for dep in deps:
         key = (dep["ecosystem"], dep["name"], dep["version"])
         if key not in seen:
@@ -176,7 +174,7 @@ def _dedupe(deps: List[Dependency]) -> List[Dependency]:
     return unique
 
 
-def parse_lockfile(filepath: str) -> List[Dependency]:
+def parse_lockfile(filepath: str) -> list[Dependency]:
     """Auto-detect lockfile type from filename and dispatch to the right parser."""
     name = Path(filepath).name.lower()
     if name == "package-lock.json":
