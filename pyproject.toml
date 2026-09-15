@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "dep-gate"
+name = "dep-vuln-gate"
 dynamic = ["version"]
 description = "A CI gate that scans package-lock.json/requirements.txt/go.sum/Cargo.lock against OSV.dev and fails the build on vulnerabilities at or above a configurable severity threshold."
 readme = "README.md"

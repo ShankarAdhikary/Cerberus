@@ -21,12 +21,24 @@ database and fails CI when findings meet a severity threshold.
 ## Install
 
 ```bash
-# From a tagged release (verified end-to-end in a clean venv):
-pip install git+https://github.com/ShankarAdhikary/Cerberus.git@v1.0.0
+pip install dep-vuln-gate
 ```
 
-This installs a `dep-gate` console command. Not yet published to PyPI —
-see `docs/Tracker.md` for exactly what was and wasn't verified there.
+From [PyPI](https://pypi.org/project/dep-vuln-gate/) — verified end-to-end
+in a clean venv (install, `--help`, a real live scan against OSV.dev).
+Note the PyPI/`pip install` name is `dep-vuln-gate`, not `dep-gate` —
+that shorter name was already too similar to an existing, unrelated PyPI
+package for PyPI's own upload validator to accept (see `docs/Tracker.md`
+for the exact rejection and the availability checks that did and didn't
+catch it up front). The **console command** installed either way is
+`dep-gate` (short, what you actually type) — only the package name you
+`pip install` differs.
+
+Also installable from a tagged release without PyPI at all (equally
+verified):
+```bash
+pip install git+https://github.com/ShankarAdhikary/Cerberus.git@v1.0.0
+```
 
 Alternatively, without installing the package at all:
 ```bash
@@ -36,12 +48,10 @@ pip install -r requirements.txt
 python -m dep_gate.cli --file package-lock.json --fail-on high
 ```
 
-**In another repo's own CI**, pin to a released tag rather than `@main` —
-this repo's own `security-scan.yml` isn't a reusable `workflow_call`
-workflow (it's meant to be copied, not referenced via `uses:`), so the
-thing to pin is the install itself:
+**In another repo's own CI**, pin to a released version rather than a
+moving target:
 ```yaml
-- run: pip install git+https://github.com/ShankarAdhikary/Cerberus.git@v1.0.0
+- run: pip install dep-vuln-gate==1.0.0
 - run: dep-gate --file package-lock.json --fail-on high
 ```
 
