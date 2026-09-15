@@ -159,4 +159,10 @@ either lockfile and uploads the JSON report as a build artifact.
 - Four ecosystems supported (`npm`, `PyPI`, `Go`, `crates.io`). OSV also
   covers Maven, RubyGems, Packagist, etc. — the same batch/hydrate client
   works for those, you'd just need lockfile parsers for each.
-- No SBOM (CycloneDX/SPDX) export yet.
+- SPDX SBOM format not supported (CycloneDX is).
+- `--pr-comment` isn't wired into the multi-ecosystem PR-gate workflow
+  below — see that section for why.
+
+## License
+
+[MIT](LICENSE)
