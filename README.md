@@ -1,5 +1,7 @@
 # Dependency Vulnerability Gate
 
+Created by [Shankar Adhikary](https://github.com/ShankarAdhikary).
+
 A minimal Software Composition Analysis (SCA) CLI that scans `package-lock.json`
 or `requirements.txt` against the [OSV.dev](https://osv.dev) vulnerability
 database and fails CI when findings meet a severity threshold.

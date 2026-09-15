@@ -49,6 +49,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="dep-gate",
         description="Scan a lockfile for known vulnerabilities via OSV.dev and gate CI on the result.",
+        epilog="Cerberus (cerberus-sca) - created by Shankar Adhikary - https://github.com/ShankarAdhikary/Cerberus",
     )
     parser.add_argument(
         "--file",
