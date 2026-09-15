@@ -21,18 +21,18 @@ database and fails CI when findings meet a severity threshold.
 ## Install
 
 ```bash
-pip install dep-vuln-gate
+pip install cerberus-sca
 ```
 
-From [PyPI](https://pypi.org/project/dep-vuln-gate/) — verified end-to-end
+From [PyPI](https://pypi.org/project/cerberus-sca/) — verified end-to-end
 in a clean venv (install, `--help`, a real live scan against OSV.dev).
-Note the PyPI/`pip install` name is `dep-vuln-gate`, not `dep-gate` —
-that shorter name was already too similar to an existing, unrelated PyPI
-package for PyPI's own upload validator to accept (see `docs/Tracker.md`
-for the exact rejection and the availability checks that did and didn't
-catch it up front). The **console command** installed either way is
-`dep-gate` (short, what you actually type) — only the package name you
-`pip install` differs.
+Note the PyPI/`pip install` name is `cerberus-sca`, not `cerberus` or
+`dep-gate` — `dep-gate` was too similar to an existing, unrelated PyPI
+package for PyPI's own upload validator to accept, and the project's own
+name, `cerberus`, is already taken by a different, unrelated PyPI package
+(see `docs/Tracker.md` and `docs/TechSpec.md` §5 for the full naming
+history). The **console command** is `dep-gate` (short, what you
+actually type) regardless of which name you `pip install`.
 
 Also installable from a tagged release without PyPI at all (equally
 verified):
@@ -51,7 +51,7 @@ python -m dep_gate.cli --file package-lock.json --fail-on high
 **In another repo's own CI**, pin to a released version rather than a
 moving target:
 ```yaml
-- run: pip install dep-vuln-gate==1.0.0
+- run: pip install cerberus-sca==1.0.0
 - run: dep-gate --file package-lock.json --fail-on high
 ```
 
