@@ -200,7 +200,14 @@ security review (network egress is auditable to one file).
   (always fetches every vuln ID fresh).
 - For persistence *across* CI runs (the actual point of this cache),
   the workflow must restore/save the cache file itself, e.g. via
-  `actions/cache` keyed on a stable key.
+  `actions/cache` keyed on a stable key. `actions/cache`'s `save-always`
+  input must be set to `true` — its default (`false`) only saves the
+  cache when the *job* succeeds, but this gate's job legitimately fails
+  on real findings, and a PR sitting on an unfixed vulnerability across
+  repeated pushes is exactly the case that most needs a persisted cache.
+  Confirmed live in `security-scan.yml`: without `save-always: true`,
+  a real failing run's cache was silently never saved, so the next
+  run's `restore-keys` found nothing.
 
 ### 2.9 GitHub API client module (`github_client.py`)
 - This is the tool's SECOND (and, per PRD.md's zero-telemetry NFR, only

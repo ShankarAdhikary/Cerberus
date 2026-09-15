@@ -35,6 +35,15 @@ jobs:
           key: dep-gate-osv-cache-${{ github.run_id }}
           restore-keys: |
             dep-gate-osv-cache-
+          # actions/cache's default (save-always: false) only saves the
+          # cache when the JOB succeeds - but this gate's whole purpose is
+          # to fail the job on real findings, so a PR sitting on an
+          # unfixed vulnerability (getting pushed to repeatedly) would
+          # otherwise never get a persisted cache at all, defeating the
+          # point. Confirmed live: the first real run here failed (as
+          # designed) and its cache was never saved, so the second run's
+          # restore-keys had nothing to find.
+          save-always: true
 
       - name: Scan npm lockfile (new/changed deps only)
         if: hashFiles('package-lock.json') != ''
