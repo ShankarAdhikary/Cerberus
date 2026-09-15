@@ -61,6 +61,21 @@ not when the code merely runs once locally.
 
   Closed PR #2 (commented with the summary above) without merging and deleted `demo/multi-file-verification` both locally and on the remote — confirmed `main` was never touched by any of it (`go.sum` returns 404 on `main` post-cleanup). Docs updated (TechSpec.md §2.10, AppFlow.md §1/§2/§3, Schema.md `Vulnerability`, Design.md §3.2/§4, README.md).
 
+- [x] **Packaging: `pyproject.toml`, `dep-gate` console script, `v1.0.0` tag, verified `git+https` install.** Closes the last gap before third-party adoption — until now `dep_gate` had no way to be `pip install`ed outside this repo, and no git tag existed despite `__version__ = "1.0.0"` already being declared.
+  - **Name check (real API calls, not assumed)**: `curl -s -o /dev/null -w "%{http_code}\n" https://pypi.org/pypi/dep-gate/json` → `404` (available); same check against `https://test.pypi.org/pypi/dep-gate/json` → `404` (available there too). `dep-gate` used as-is.
+  - **`pyproject.toml`**: `hatchling` build backend (no concrete reason to prefer `setuptools` — no C extensions, no complex package-data rules). `[tool.hatch.version] path = "dep_gate/__init__.py"` reads `__version__` dynamically — confirmed live: `pip install -e .` reported `Successfully installed ... dep-gate-1.0.0` with zero hardcoded version anywhere in `pyproject.toml`. Exact-pinned deps mirroring `requirements.txt` (`requests==2.32.5`, `cvss==3.6`, `rich==15.0.0`); `requirements.txt` kept (not deleted) as a hand-maintained mirror with a comment naming `pyproject.toml` authoritative, since `python -m dep_gate.cli` without installing the package is still a supported path.
+  - **Console script, verified not assumed**: `[project.scripts] dep-gate = "dep_gate.cli:run"` — `run()` needed **no wrapper**. Confirmed by actually installing and running `dep-gate --file /nonexistent/package-lock.json` → printed the usage error and exited `2`, proving the entry-point shim itself calls `sys.exit(run())` and `run()`'s return value genuinely becomes the process exit code (not just checking that `--help` exits `0`, which argparse would do on its own regardless of the entry point's correctness).
+  - **Three separate clean-venv installs, each independently verified** (`rm -rf` fresh `python3 -m venv` every time, no state carried over):
+    1. `pip install -e .` in `/tmp/venv-editable` → `dep-gate --help` byte-identical to `python -m dep_gate.cli --help` (`diff` — zero output).
+    2. `pip install .` (non-editable) in `/tmp/venv-nonedit` → `dep-gate --file package-lock.json --fail-on high` against a real `lodash@4.17.15` fixture, live OSV.dev: 3 real HIGH findings (`GHSA-r5fr-rjxr-66jc`, `GHSA-p6mc-m468-83gw`, `GHSA-35jh-r3h4-6jhm`), exit `1`.
+    3. `pip install dist/dep_gate-1.0.0-py3-none-any.whl` (the actual **built** wheel, not editable — editable installs can mask real packaging bugs) in `/tmp/venv-wheel` → same `--help` check plus the same live scan, same 3 findings, exit `1`.
+  - **Build artifact contents inspected directly** (`python -m build` in an isolated venv with only `build` installed, then `unzip -l`/`tar tzf`): wheel = 16 files, exactly `dep_gate/*.py` (11 modules) + `dep_gate-1.0.0.dist-info/` (METADATA, WHEEL, entry_points.txt, `licenses/LICENSE`, RECORD) — no `docs/`, `tests/`, `.github/`. sdist = `dep_gate/*.py` + `.gitignore`, `LICENSE`, `README.md`, `pyproject.toml`, `PKG-INFO` — same exclusions, README/LICENSE present as required.
+  - **Tag**: `git tag -a v1.0.0 -m "..."` (annotated, summary pulled from this file's Done history) and `git push origin v1.0.0` — both succeeded (`* [new tag] v1.0.0 -> v1.0.0`).
+  - **`git+https` install, the task's stated minimum distribution bar, verified in a totally clean venv with zero local-repo involvement**: `pip install "git+https://github.com/ShankarAdhikary/Cerberus.git@v1.0.0"` in `/tmp/venv-git-tag` → `Successfully installed ... dep-gate-1.0.0`, `pip show dep-gate` confirms `Version: 1.0.0`, `dep-gate --help` works, and the same live OSV.dev scan against the same fixture produced the same 3 findings and exit `1`.
+  - **Real PyPI/TestPyPI publication was NOT attempted** — no `~/.pypirc`, no `TWINE_USERNAME`/`TWINE_PASSWORD` env vars, no PyPI account/API token available to this agent. The task's own wording makes this conditional ("if you also want real PyPI distribution"); until credentials are provided, `pip install git+...@v1.0.0` is the verified distribution path, and `pip install dep-gate` from a real index is **not yet true** — do not claim otherwise, and do not attempt an upload without an explicit token handed to this session.
+  - Lint note: `ruff check` on the packaging-adjacent files this task actually touched is clean; two pre-existing findings remain in `lockfile.py`/`suppress.py` (an import-sort nit, a `datetime.UTC` alias suggestion) — both files are on this task's explicit do-not-touch list (scanning logic), so left alone rather than fixed as unrelated scope creep. `black` similarly flagged two test files from the *prior* (multi-file) task's edits as needing reformatting under a newer `black` than last ran; unrelated to packaging, not touched.
+  - Docs updated: `TechSpec.md` new §5 (packaging/build-backend choice and reasoning), `README.md` (Install section with the verified `git+https` command, a CI-pin-to-tag snippet, `Usage` section switched to the `dep-gate` command with a note on why examples still show `python -m` too), this entry.
+
 ## To Do
 
 - [ ] *(none currently — all PRD.md V1 items implemented and tested)*
@@ -71,7 +86,7 @@ not when the code merely runs once locally.
 
 ## Blocked
 
-- [ ] *(none currently)*
+- [ ] Real PyPI/TestPyPI publication of `dep-gate` — blocked on PyPI account/API token access, which this agent does not have (`~/.pypirc` absent, no `TWINE_*` env vars). `git+https://.../Cerberus.git@v1.0.0` is the verified distribution path in the meantime. Resolve by providing a TestPyPI (then real PyPI) API token before this proceeds — do not attempt an upload without one.
 
 ## Notes for Agents Updating This Tracker
 
