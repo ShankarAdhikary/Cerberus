@@ -396,23 +396,34 @@ internal dataclasses.
 
 ## 5. Packaging & Distribution
 
-- **PyPI package name: `dep-vuln-gate`, not `dep-gate`.** `dep-gate` was
-  the original choice and passed the obvious availability check
-  (`GET https://pypi.org/pypi/dep-gate/json` → `404`, confirmed before
-  committing to it) — but that check only proves the *exact* name is
-  unclaimed, not that PyPI's upload-time validator will accept it. The
+- **PyPI package name: `cerberus-sca`, third name tried.** History:
+  `dep-gate` was the original choice and passed the obvious availability
+  check (`GET https://pypi.org/pypi/dep-gate/json` → `404`, confirmed
+  before committing to it) — but that check only proves the *exact* name
+  is unclaimed, not that PyPI's upload-time validator will accept it. The
   real upload was rejected: `400 The name 'dep-gate' is too similar to
   an existing project` — PyPI normalizes away hyphens/case when checking
   similarity, and an unrelated existing package, `depgate` (a dependency-
   confusion/supply-chain-risk detector, thematically adjacent but not
-  the same tool), already claims that normalized form. There is no
-  practical way to discover this in advance short of attempting the
-  upload — the JSON API has no "similar names" endpoint. `dep-vuln-gate`
-  (matching this repo's own directory name) was checked and clear, and
-  the upload succeeded under it. The **console command** stays `dep-gate`
-  (`[project.scripts]` isn't required to match `[project.name]`) - only
-  the `pip install <name>` target changed, not what a user actually
-  types to run the tool.
+  the same tool), already claims that normalized form. Renamed to
+  `dep-vuln-gate` (matching this repo's own directory name at the time),
+  checked clear, uploaded successfully, and published live for a period.
+  Later, on request, an attempt to rename to the project's actual name
+  `cerberus` hit a *different* failure mode — not a similarity rejection
+  but an exact-match collision: `cerberus` is an existing, unrelated,
+  well-known PyPI package (a schema/data-validation library, v1.3.8),
+  confirmed via a `200` on its JSON API before any upload was attempted.
+  Renamed again to `cerberus-sca` (SCA = Software Composition Analysis,
+  the category this tool falls under) — both the exact name and its
+  normalized hyphen-stripped form (`cerberussca`) returned `404`, and the
+  real upload succeeded: https://pypi.org/project/cerberus-sca/. Note
+  `dep-vuln-gate` v1.0.0 remains published on PyPI under its own name —
+  PyPI does not support deleting-and-reusing a project name, so the
+  earlier name isn't reclaimed, just superseded as the one advertised in
+  README.md. The **console command** stays `dep-gate` throughout all
+  three renames (`[project.scripts]` isn't required to match
+  `[project.name]`) — only the `pip install <name>` target has changed,
+  never what a user actually types to run the tool.
 - **Build backend: hatchling**, not setuptools. No concrete reason to
   prefer setuptools existed (no C extensions, no complex package-data
   rules), and hatchling's `[tool.hatch.version]` reads `__version__`
@@ -450,7 +461,7 @@ internal dataclasses.
   package artifact ships the importable code and the metadata a PyPI
   listing needs, not the whole repository.
 - **Distribution paths, both verified end-to-end in clean venvs**:
-  `pip install dep-vuln-gate` (real PyPI — https://pypi.org/project/dep-vuln-gate/)
+  `pip install cerberus-sca` (real PyPI — https://pypi.org/project/cerberus-sca/)
   and `pip install git+https://github.com/<owner>/<repo>.git@<tag>` (zero
   PyPI involvement, only a git tag). Both were confirmed with a real
   install, `dep-gate --help`, and a real live OSV.dev scan against a
