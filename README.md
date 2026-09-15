@@ -18,18 +18,48 @@ database and fails CI when findings meet a severity threshold.
 5. **Gate**: exit `1` if any finding is at or above `--fail-on` (default
    `high`), else exit `0`.
 
+## Install
+
+```bash
+# From a tagged release (verified end-to-end in a clean venv):
+pip install git+https://github.com/ShankarAdhikary/Cerberus.git@v1.0.0
+```
+
+This installs a `dep-gate` console command. Not yet published to PyPI —
+see `docs/Tracker.md` for exactly what was and wasn't verified there.
+
+Alternatively, without installing the package at all:
+```bash
+git clone https://github.com/ShankarAdhikary/Cerberus.git
+cd Cerberus/dep-vuln-gate
+pip install -r requirements.txt
+python -m dep_gate.cli --file package-lock.json --fail-on high
+```
+
+**In another repo's own CI**, pin to a released tag rather than `@main` —
+this repo's own `security-scan.yml` isn't a reusable `workflow_call`
+workflow (it's meant to be copied, not referenced via `uses:`), so the
+thing to pin is the install itself:
+```yaml
+- run: pip install git+https://github.com/ShankarAdhikary/Cerberus.git@v1.0.0
+- run: dep-gate --file package-lock.json --fail-on high
+```
+
 ## Usage
 
 ```bash
-pip install -r requirements.txt
-
-python -m dep_gate.cli --file package-lock.json --fail-on high
-python -m dep_gate.cli --file requirements.txt --fail-on critical --json report.json
+dep-gate --file package-lock.json --fail-on high
+dep-gate --file requirements.txt --fail-on critical --json report.json
 
 # --file is repeatable: scan multiple lockfiles in one invocation, with
 # one combined JSON/SARIF/SBOM/PR-comment output instead of one per file.
-python -m dep_gate.cli --file package-lock.json --file requirements.txt --fail-on high
+dep-gate --file package-lock.json --file requirements.txt --fail-on high
 ```
+
+(`python -m dep_gate.cli` works identically to `dep-gate` — the console
+script is `dep_gate.cli:run` with no wrapper, so both invoke the exact
+same code path. Every example below uses the module form only because it
+also works without installing the package; swap in `dep-gate` freely.)
 
 Flags:
 - `--file PATH` — required, **repeatable**. Path to a lockfile

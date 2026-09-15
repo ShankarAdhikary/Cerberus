@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dep-gate"
+dynamic = ["version"]
+description = "A CI gate that scans package-lock.json/requirements.txt/go.sum/Cargo.lock against OSV.dev and fails the build on vulnerabilities at or above a configurable severity threshold."
+readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "Shankar Adhikary", email = "adhikaryshankar04@gmail.com" },
+]
+requires-python = ">=3.11"
+# Exact pins, kept in sync with requirements.txt - pyproject.toml is the
+# authoritative copy; see TechSpec.md's packaging section for why both
+# files exist rather than deleting requirements.txt outright.
+dependencies = [
+    "requests==2.32.5",
+    "cvss==3.6",
+    "rich==15.0.0",
+]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+]
+
+[project.urls]
+Repository = "https://github.com/ShankarAdhikary/Cerberus"
+
+[project.optional-dependencies]
+dev = ["pytest==9.1.1"]
+
+[project.scripts]
+dep-gate = "dep_gate.cli:run"
+
+[tool.hatch.version]
+path = "dep_gate/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["dep_gate"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/dep_gate",
+    "/README.md",
+    "/LICENSE",
+]

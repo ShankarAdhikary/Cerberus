@@ -393,3 +393,48 @@ internal dataclasses.
   SARIF upload succeeds but never surfaces as a visible alert. Confirmed
   live: a real PR's code-scanning check reported "No new alerts" despite
   its own SARIF containing 8 real findings, until this trigger existed.
+
+## 5. Packaging & Distribution
+
+- **Build backend: hatchling**, not setuptools. No concrete reason to
+  prefer setuptools existed (no C extensions, no complex package-data
+  rules), and hatchling's `[tool.hatch.version]` reads `__version__`
+  directly out of `dep_gate/__init__.py` as a single source of truth —
+  the version is declared exactly once in the whole repo
+  (`dynamic = ["version"]` in `pyproject.toml`'s `[project]` table),
+  rather than duplicated into `pyproject.toml` where it could silently
+  drift from what `dep_gate.__version__` actually reports at runtime.
+- **`requirements.txt` vs. `pyproject.toml`'s `[project.dependencies]`**:
+  `pyproject.toml` is authoritative. `requirements.txt` is kept as an
+  exact hand-maintained mirror (a comment at its top says so) rather than
+  deleted outright, since it's still the install path for anyone running
+  `python -m dep_gate.cli` directly without installing the package (the
+  original, still-supported invocation form — see the module docstring)
+  and for `requirements-dev.txt`'s `-r requirements.txt` chain. There is
+  no automated check preventing the two from drifting; keeping them in
+  sync is a manual discipline enforced by this doc, not tooling — both
+  files are short and rarely touched, so the risk is low, but a future
+  agent changing one must update the other.
+- **Console script**: `dep_gate.cli:run` is used directly as the
+  `[project.scripts]` target — `run()` already returns an `int` exit
+  code and needs no `main()` wrapper, because the console-script shim
+  `pip`/`hatchling` generate calls `sys.exit(<entry point callable>())`
+  itself. Confirmed live, not assumed: installing the package and running
+  `dep-gate --file /nonexistent/package-lock.json` exits `2` (a real
+  usage error), proving the entry point's return value genuinely becomes
+  the process exit code, not just that `--help` happens to exit `0` via
+  argparse's own `SystemExit`.
+- **What ships**: `[tool.hatch.build.targets.wheel].packages = ["dep_gate"]`
+  and `[tool.hatch.build.targets.sdist].include` are both scoped
+  explicitly to `dep_gate/`, `README.md`, and `LICENSE` — `docs/`,
+  `tests/`, and `.github/` are deliberately excluded from both the wheel
+  and the sdist (confirmed by inspecting `unzip -l`/`tar tzf` output on a
+  real build - see Tracker.md for the exact file lists observed). A
+  package artifact ships the importable code and the metadata a PyPI
+  listing needs, not the whole repository.
+- **Distribution path**: `pip install git+https://github.com/<owner>/<repo>.git@<tag>`
+  is the verified minimum bar (works with zero PyPI involvement, using
+  only a git tag). Real PyPI/TestPyPI publication requires an account
+  and API token this agent does not have access to — see Tracker.md for
+  what was and wasn't verified, and confirm with whoever holds those
+  credentials before treating PyPI installability as proven.
