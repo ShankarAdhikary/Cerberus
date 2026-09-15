@@ -1,3 +1,7 @@
+# Kept in sync with pyproject.toml's [project.dependencies] by hand -
+# pyproject.toml is authoritative (see TechSpec.md's packaging section).
+# This file exists for `pip install -r requirements.txt` / `python -m
+# dep_gate.cli` users who aren't installing the package itself.
 requests==2.32.5
 cvss==3.6
 rich==15.0.0
