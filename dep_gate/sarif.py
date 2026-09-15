@@ -12,8 +12,6 @@ source positions, and fabricating a region would misrepresent the data.
 
 from __future__ import annotations
 
-from typing import Dict, List
-
 SARIF_VERSION = "2.1.0"
 SARIF_SCHEMA = (
     "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/"
@@ -24,7 +22,7 @@ SARIF_SCHEMA = (
 # than our five severity levels - CRITICAL and HIGH both map to "error"
 # since SARIF doesn't distinguish beyond that in the level itself (the
 # message text still carries the exact severity word).
-_LEVEL_BY_SEVERITY: Dict[str, str] = {
+_LEVEL_BY_SEVERITY: dict[str, str] = {
     "CRITICAL": "error",
     "HIGH": "error",
     "MODERATE": "warning",
@@ -52,9 +50,7 @@ def _result(finding: dict, scanned_file: str) -> dict:
         "ruleId": finding["vuln_id"],
         "level": _LEVEL_BY_SEVERITY.get(finding["severity"], "note"),
         "message": {"text": message},
-        "locations": [
-            {"physicalLocation": {"artifactLocation": {"uri": scanned_file}}}
-        ],
+        "locations": [{"physicalLocation": {"artifactLocation": {"uri": scanned_file}}}],
     }
     if finding.get("suppressed"):
         result["suppressions"] = [
@@ -63,9 +59,9 @@ def _result(finding: dict, scanned_file: str) -> dict:
     return result
 
 
-def build_sarif(findings: List[dict], scanned_file: str) -> dict:
+def build_sarif(findings: list[dict], scanned_file: str) -> dict:
     """Build a SARIF document (as a plain dict, ready for json.dump)."""
-    rules: Dict[str, dict] = {}
+    rules: dict[str, dict] = {}
     results = []
     for finding in findings:
         vuln_id = finding["vuln_id"]

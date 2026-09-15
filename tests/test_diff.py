@@ -9,7 +9,6 @@ from __future__ import annotations
 import json
 import subprocess
 from pathlib import Path
-from typing import Dict
 
 import pytest
 
@@ -18,7 +17,7 @@ from dep_gate.diff import GitDiffError, diff_dependencies, get_base_dependencies
 LOCKFILE_NAME = "package-lock.json"
 
 
-def _npm_lockfile(deps: Dict[str, str]) -> str:
+def _npm_lockfile(deps: dict[str, str]) -> str:
     packages = {"": {"name": "sample", "version": "1.0.0"}}
     for name, version in deps.items():
         packages[f"node_modules/{name}"] = {"version": version}

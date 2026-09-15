@@ -18,7 +18,7 @@ This module tries, in order:
 from __future__ import annotations
 
 import re
-from typing import List, NamedTuple, Optional, Tuple
+from typing import NamedTuple
 
 try:
     from cvss import CVSS2, CVSS3
@@ -30,7 +30,7 @@ LEVELS = ["UNKNOWN", "LOW", "MODERATE", "HIGH", "CRITICAL"]
 
 class Severity(NamedTuple):
     level: str  # one of LEVELS
-    score: Optional[float]  # numeric CVSS base score if available, else None
+    score: float | None  # numeric CVSS base score if available, else None
     source: str  # how we derived it, for transparency in reports
 
 
@@ -46,7 +46,7 @@ def _level_from_score(score: float) -> str:
     return "UNKNOWN"
 
 
-def _score_from_vector(vector: str) -> Optional[float]:
+def _score_from_vector(vector: str) -> float | None:
     if CVSS3 is None:
         return None
     try:
@@ -54,7 +54,10 @@ def _score_from_vector(vector: str) -> Optional[float]:
             return float(CVSS3(vector).base_score)
         if CVSS2 is not None:
             return float(CVSS2(vector).base_score)
-    except Exception:
+    except Exception:  # noqa: BLE001 - the cvss package raises varied/undocumented
+        # exception types on a malformed vector; any parse failure degrades to
+        # None (falls through to the database_specific fallback), never raises -
+        # see AppFlow.md §3's malformed-CVSS-vector row.
         return None
     return None
 
@@ -90,7 +93,7 @@ def assess(vuln_record: dict) -> Severity:
 _VERSION_PART_RE = re.compile(r"\d+|\D+")
 
 
-def _version_sort_key(version: str) -> Tuple[Tuple[int, object], ...]:
+def _version_sort_key(version: str) -> tuple[tuple[int, object], ...]:
     """
     Natural-sort key so numeric version segments compare as integers
     (e.g. "4.17.2" < "4.17.19") instead of a plain string sort, which
@@ -104,8 +107,8 @@ def fixed_version(
     vuln_record: dict,
     ecosystem: str,
     package_name: str,
-    installed_version: Optional[str] = None,
-) -> Optional[str]:
+    installed_version: str | None = None,
+) -> str | None:
     """
     Find the version that fixes this vulnerability for a given package,
     for use in remediation advice (e.g. "upgrade to lodash@4.17.21").
@@ -127,15 +130,15 @@ def fixed_version(
     """
     installed_key = _version_sort_key(installed_version) if installed_version is not None else None
 
-    all_fixes: List[str] = []
-    in_range_fixes: List[str] = []
+    all_fixes: list[str] = []
+    in_range_fixes: list[str] = []
 
     for affected in vuln_record.get("affected", []):
         pkg = affected.get("package", {})
         if pkg.get("ecosystem") != ecosystem or pkg.get("name") != package_name:
             continue
         for rng in affected.get("ranges", []):
-            current_introduced: Optional[str] = None
+            current_introduced: str | None = None
             for event in rng.get("events", []):
                 if "introduced" in event:
                     current_introduced = event["introduced"]
@@ -152,11 +155,10 @@ def fixed_version(
 
 
 def _installed_in_range(
-    installed_key: Tuple[Tuple[int, object], ...], introduced: Optional[str], fixed: str
+    installed_key: tuple[tuple[int, object], ...], introduced: str | None, fixed: str
 ) -> bool:
     """True if `installed_key` falls within [introduced, fixed). "0" is OSV's
     sentinel for "no lower bound", same as introduced being absent."""
-    if introduced not in (None, "0"):
-        if installed_key < _version_sort_key(introduced):
-            return False
+    if introduced not in (None, "0") and installed_key < _version_sort_key(introduced):
+        return False
     return installed_key < _version_sort_key(fixed)

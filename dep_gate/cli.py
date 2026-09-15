@@ -13,12 +13,12 @@ import json
 import os
 import sys
 import time
-from typing import List, Optional
 
 from . import cache as cache_module
 from . import diff as diff_module
-from . import github_client
-from . import lockfile, osv_client, sarif as sarif_module, sbom as sbom_module, severity
+from . import github_client, lockfile, osv_client, severity
+from . import sarif as sarif_module
+from . import sbom as sbom_module
 from . import suppress as suppress_module
 
 THRESHOLD_ORDER = ["low", "moderate", "high", "critical"]
@@ -57,7 +57,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default="high",
         help="Minimum severity that fails the build (default: high)",
     )
-    parser.add_argument("--json", metavar="PATH", help="Also write a machine-readable JSON report to PATH")
+    parser.add_argument(
+        "--json", metavar="PATH", help="Also write a machine-readable JSON report to PATH"
+    )
     parser.add_argument(
         "--sarif",
         metavar="PATH",
@@ -138,11 +140,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def run(argv: Optional[List[str]] = None) -> int:
+def run(argv: list[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
 
     pr_comment_token = os.environ.get("GITHUB_TOKEN", "")
-    if args.pr_comment and (not args.github_repo or not args.github_pr_number or not pr_comment_token):
+    if args.pr_comment and (
+        not args.github_repo or not args.github_pr_number or not pr_comment_token
+    ):
         _print(
             "Error: --pr-comment requires --github-repo, --github-pr-number, and a "
             "GITHUB_TOKEN environment variable."
@@ -162,7 +166,7 @@ def run(argv: Optional[List[str]] = None) -> int:
         _print(f"Error computing diff: {exc}")
         return 2
 
-    suppressions: List[suppress_module.Suppression] = []
+    suppressions: list[suppress_module.Suppression] = []
     if args.ignore_file:
         try:
             suppressions = suppress_module.load_suppressions(args.ignore_file)
@@ -256,7 +260,8 @@ def run(argv: Optional[List[str]] = None) -> int:
 
     threshold_idx = THRESHOLD_ORDER.index(args.fail_on)
     blocking = [
-        f for f in findings
+        f
+        for f in findings
         if not f.get("suppressed")
         and f["severity"].lower() in THRESHOLD_ORDER
         and THRESHOLD_ORDER.index(f["severity"].lower()) >= threshold_idx
@@ -274,10 +279,10 @@ def run(argv: Optional[List[str]] = None) -> int:
             github_client.upsert_comment(
                 args.github_repo, args.github_pr_number, body, pr_comment_token
             )
-        except Exception as exc:  # deliberately broad: a comment-posting failure (network
-            # error, bad token, rate limit, ...) must never change the scan's own
-            # pass/fail result - see AppFlow.md §4's "additive output, not a
-            # replacement" rule.
+        except Exception as exc:  # noqa: BLE001
+            # Deliberately broad: a comment-posting failure (network error, bad
+            # token, rate limit, ...) must never change the scan's own pass/fail
+            # result - see AppFlow.md §4's "additive output, not a replacement" rule.
             _print(f"Warning: failed to post PR comment: {exc}")
 
     if blocking:
@@ -303,7 +308,10 @@ def _report(findings: list, verbose: bool = False) -> None:
         for f in sorted(findings, key=lambda x: x["severity"], reverse=True):
             severity_cell = f["severity"] + (" (suppressed)" if f.get("suppressed") else "")
             row = [
-                f["package"], f["version"], severity_cell, f["vuln_id"],
+                f["package"],
+                f["version"],
+                severity_cell,
+                f["vuln_id"],
                 f"upgrade to {f['fixed_version']}" if f["fixed_version"] else "no fix yet",
             ]
             if verbose:
@@ -312,7 +320,9 @@ def _report(findings: list, verbose: bool = False) -> None:
         _console.print(table)
     else:
         for f in findings:
-            fix_msg = f"upgrade to {f['fixed_version']}" if f["fixed_version"] else "no fix published yet"
+            fix_msg = (
+                f"upgrade to {f['fixed_version']}" if f["fixed_version"] else "no fix published yet"
+            )
             severity_text = f["severity"] + (" (suppressed)" if f.get("suppressed") else "")
             line = f"[{severity_text}] {f['package']}@{f['version']} - {f['vuln_id']} - {fix_msg}"
             if verbose:

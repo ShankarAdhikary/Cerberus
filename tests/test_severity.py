@@ -162,9 +162,7 @@ def test_fixed_version_natural_sort_handles_double_digit_minor() -> None:
 
 
 def test_fixed_version_returns_none_when_no_fix_published() -> None:
-    record = {
-        "affected": [{"package": {"ecosystem": "npm", "name": "lodash"}, "ranges": []}]
-    }
+    record = {"affected": [{"package": {"ecosystem": "npm", "name": "lodash"}, "ranges": []}]}
 
     result = fixed_version(record, "npm", "lodash")
 

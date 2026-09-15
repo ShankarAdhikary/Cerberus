@@ -18,7 +18,6 @@ from __future__ import annotations
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import List
 
 from .lockfile import Dependency, parse_lockfile
 
@@ -31,7 +30,7 @@ def _dep_key(dep: Dependency) -> tuple:
     return (dep["ecosystem"], dep["name"], dep["version"])
 
 
-def get_base_dependencies(filepath: str, base_ref: str) -> List[Dependency]:
+def get_base_dependencies(filepath: str, base_ref: str) -> list[Dependency]:
     """
     Return the dependency list as it existed in `filepath` at `base_ref`.
     Returns an empty list if the file didn't exist at that ref (e.g. it's
@@ -67,7 +66,7 @@ def get_base_dependencies(filepath: str, base_ref: str) -> List[Dependency]:
         return parse_lockfile(str(tmp_path))
 
 
-def diff_dependencies(filepath: str, base_ref: str) -> List[Dependency]:
+def diff_dependencies(filepath: str, base_ref: str) -> list[Dependency]:
     """
     Return only the dependencies in `filepath` that are new or have changed
     version relative to `base_ref`. A version bump counts as "new" because

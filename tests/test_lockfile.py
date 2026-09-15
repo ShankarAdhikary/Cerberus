@@ -158,7 +158,7 @@ def test_parse_cargo_lock_skips_path_and_git_dependencies(fixtures_dir: Path) ->
 
 def test_parse_cargo_lock_missing_package_table_returns_empty(tmp_path: Path) -> None:
     cargo_lock = tmp_path / "Cargo.lock"
-    cargo_lock.write_text('version = 3\n', encoding="utf-8")
+    cargo_lock.write_text("version = 3\n", encoding="utf-8")
 
     deps = parse_cargo_lock(str(cargo_lock))
 

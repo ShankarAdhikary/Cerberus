@@ -8,7 +8,7 @@ before hydration, and correct retry count on simulated 429/500 responses.
 
 from __future__ import annotations
 
-from typing import Any, List
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -30,7 +30,7 @@ def _fake_response(status_code: int, json_data: Any = None) -> MagicMock:
 
 
 def test_batch_query_maps_results_back_to_dependency_keys(monkeypatch: pytest.MonkeyPatch) -> None:
-    deps: List[osv_client.Dependency] = [
+    deps: list[osv_client.Dependency] = [
         {"name": "lodash", "version": "4.17.15", "ecosystem": "npm"},
         {"name": "requests", "version": "2.25.0", "ecosystem": "PyPI"},
     ]
@@ -58,7 +58,7 @@ def test_batch_query_maps_results_back_to_dependency_keys(monkeypatch: pytest.Mo
 
 def test_batch_query_chunks_at_max_batch_size(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(osv_client, "MAX_BATCH_SIZE", 2)
-    deps: List[osv_client.Dependency] = [
+    deps: list[osv_client.Dependency] = [
         {"name": f"pkg{i}", "version": "1.0.0", "ecosystem": "npm"} for i in range(5)
     ]
     session = MagicMock(spec=requests.Session)
