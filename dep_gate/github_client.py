@@ -1,0 +1,126 @@
+"""
+GitHub API client for the opt-in `--pr-comment` feature: posts/updates a
+single idempotent PR comment summarizing blocking findings.
+
+This is the tool's SECOND network egress point, after osv_client.py - see
+PRD.md's zero-telemetry NFR, which scopes any egress beyond api.osv.dev to
+"the GitHub API for PR comments the user explicitly enables". It must
+never be called unless the user passed --pr-comment; cli.py enforces
+that, not this module.
+
+Auth model: the workflow's own GITHUB_TOKEN with job-scoped
+`permissions: pull-requests: write`, not a GitHub App - see Tracker.md's
+"Resolved decisions" for the rationale (this is a single-repo PR-gate
+tool; a GitHub App adds infrastructure PRD.md's NFRs explicitly reject).
+"""
+
+from __future__ import annotations
+
+from typing import List, Optional
+
+import requests
+
+API_BASE = "https://api.github.com"
+REQUEST_TIMEOUT = 15
+
+# Marks our own comment so upsert_comment() can find and update it on a
+# re-run instead of posting a new comment every push - Design.md §4's
+# idempotency rule.
+COMMENT_MARKER = "<!-- dep-gate-pr-comment -->"
+
+_EMOJI_BY_SEVERITY = {"CRITICAL": "🔴", "HIGH": "🟠", "MODERATE": "🟡", "LOW": "🔵"}
+
+
+def _headers(token: str) -> dict:
+    return {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+
+
+def render_pr_comment(
+    blocking: List[dict],
+    scanned_count: int,
+    fail_on: str,
+    diff_mode: bool,
+    base_ref: Optional[str],
+) -> str:
+    """
+    Render the Markdown PR comment body per Design.md §4. Pure function,
+    no I/O - shows only *blocking* findings above the fold (not every
+    LOW/UNKNOWN finding), and never includes a raw CVSS vector string,
+    per that same design rule.
+    """
+    if blocking:
+        result_line = f"**Result:** ❌ Failed — {len(blocking)} finding(s) at or above `{fail_on}`"
+    else:
+        result_line = f"**Result:** ✅ Passed — no finding(s) at or above `{fail_on}`"
+
+    lines = [
+        "## 🔒 Dependency Vulnerability Gate",
+        "",
+        result_line,
+        "",
+    ]
+
+    if blocking:
+        lines += ["| Severity | Package | Vuln ID | Fix |", "|---|---|---|---|"]
+        for f in blocking:
+            emoji = _EMOJI_BY_SEVERITY.get(f["severity"], "")
+            fix = f"Upgrade to `{f['fixed_version']}`" if f.get("fixed_version") else "no fix yet"
+            lines.append(
+                f"| {emoji} {f['severity']} | `{f['package']}@{f['version']}` | "
+                f"{f['vuln_id']} | {fix} |"
+            )
+        lines.append("")
+
+    scanned_desc = f"Scanned: {scanned_count} dependencies"
+    if diff_mode:
+        scanned_desc += f" (diff-only vs `{base_ref}`)"
+
+    lines += [
+        "<details>",
+        "<summary>Scan details</summary>",
+        "",
+        f"- {scanned_desc}",
+        f"- Threshold: `--fail-on {fail_on}`",
+        "- Full report: see the `dependency-vulnerability-report` build artifact",
+        "",
+        "</details>",
+    ]
+
+    return COMMENT_MARKER + "\n" + "\n".join(lines)
+
+
+def find_existing_comment_id(
+    repo: str, pr_number: int, token: str, session: Optional[requests.Session] = None
+) -> Optional[int]:
+    """Find our own bot comment on this PR (identified by COMMENT_MARKER), if any."""
+    session = session or requests.Session()
+    url = f"{API_BASE}/repos/{repo}/issues/{pr_number}/comments"
+    resp = session.get(url, headers=_headers(token), timeout=REQUEST_TIMEOUT)
+    resp.raise_for_status()
+    for comment in resp.json():
+        if COMMENT_MARKER in comment.get("body", ""):
+            return comment["id"]
+    return None
+
+
+def upsert_comment(
+    repo: str, pr_number: int, body: str, token: str, session: Optional[requests.Session] = None
+) -> None:
+    """Create the bot's findings comment on a PR, or update it in place if one already exists."""
+    session = session or requests.Session()
+    existing_id = find_existing_comment_id(repo, pr_number, token, session=session)
+
+    headers = _headers(token)
+    payload = {"body": body}
+    if existing_id is not None:
+        url = f"{API_BASE}/repos/{repo}/issues/comments/{existing_id}"
+        resp = session.patch(url, headers=headers, json=payload, timeout=REQUEST_TIMEOUT)
+    else:
+        url = f"{API_BASE}/repos/{repo}/issues/{pr_number}/comments"
+        resp = session.post(url, headers=headers, json=payload, timeout=REQUEST_TIMEOUT)
+
+    resp.raise_for_status()
