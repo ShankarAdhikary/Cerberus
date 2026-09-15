@@ -1,0 +1,97 @@
+name: Dependency Vulnerability Gate
+
+on:
+  pull_request:
+    paths:
+      - "package-lock.json"
+      - "requirements.txt"
+      - "go.sum"
+      - "Cargo.lock"
+
+permissions:
+  contents: read
+  security-events: write # required to upload SARIF to code scanning
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history needed so `git show origin/<base>:<file>` works
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install scanner dependencies
+        run: pip install -r requirements.txt
+
+      - name: Restore OSV hydration cache
+        uses: actions/cache@v4
+        with:
+          path: .dep-gate-cache.json
+          key: dep-gate-osv-cache-${{ github.run_id }}
+          restore-keys: |
+            dep-gate-osv-cache-
+
+      - name: Scan npm lockfile (new/changed deps only)
+        if: hashFiles('package-lock.json') != ''
+        run: >
+          python -m dep_gate.cli
+          --file package-lock.json
+          --fail-on high
+          --diff-only --base-ref origin/${{ github.base_ref }}
+          --json npm-report.json
+          --sarif npm-report.sarif
+          --cache-file .dep-gate-cache.json
+
+      - name: Scan Python requirements (new/changed deps only)
+        if: hashFiles('requirements.txt') != ''
+        run: >
+          python -m dep_gate.cli
+          --file requirements.txt
+          --fail-on high
+          --diff-only --base-ref origin/${{ github.base_ref }}
+          --json python-report.json
+          --sarif python-report.sarif
+          --cache-file .dep-gate-cache.json
+
+      - name: Scan Go go.sum (new/changed deps only)
+        if: hashFiles('go.sum') != ''
+        run: >
+          python -m dep_gate.cli
+          --file go.sum
+          --fail-on high
+          --diff-only --base-ref origin/${{ github.base_ref }}
+          --json go-report.json
+          --sarif go-report.sarif
+          --cache-file .dep-gate-cache.json
+
+      - name: Scan Rust Cargo.lock (new/changed deps only)
+        if: hashFiles('Cargo.lock') != ''
+        run: >
+          python -m dep_gate.cli
+          --file Cargo.lock
+          --fail-on high
+          --diff-only --base-ref origin/${{ github.base_ref }}
+          --json cargo-report.json
+          --sarif cargo-report.sarif
+          --cache-file .dep-gate-cache.json
+
+      - name: Upload vulnerability report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-vulnerability-report
+          path: "*-report.json"
+          if-no-files-found: ignore
+
+      - name: Upload SARIF to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: .
+          category: dep-gate
+        continue-on-error: true # a scan-step failure above must not be masked by this step
