@@ -28,22 +28,23 @@ jobs:
       - name: Install scanner dependencies
         run: pip install -r requirements.txt
 
+      # Split restore/save (rather than the combined actions/cache action)
+      # so the save step can run unconditionally via `if: always()` below -
+      # this gate's job legitimately fails on real findings, and a PR
+      # sitting on an unfixed vulnerability across repeated pushes is
+      # exactly the case that most needs a persisted cache. The combined
+      # action's own `save-always` input looked like the right fix but is
+      # deprecated and, confirmed live here, does not actually work
+      # ("Cache not found" persisted across two real failing runs even
+      # with save-always: true set) - GitHub's own docs point at this
+      # restore/save split as the correct replacement.
       - name: Restore OSV hydration cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: .dep-gate-cache.json
           key: dep-gate-osv-cache-${{ github.run_id }}
           restore-keys: |
             dep-gate-osv-cache-
-          # actions/cache's default (save-always: false) only saves the
-          # cache when the JOB succeeds - but this gate's whole purpose is
-          # to fail the job on real findings, so a PR sitting on an
-          # unfixed vulnerability (getting pushed to repeatedly) would
-          # otherwise never get a persisted cache at all, defeating the
-          # point. Confirmed live: the first real run here failed (as
-          # designed) and its cache was never saved, so the second run's
-          # restore-keys had nothing to find.
-          save-always: true
 
       - name: Scan npm lockfile (new/changed deps only)
         if: hashFiles('package-lock.json') != ''
@@ -88,6 +89,13 @@ jobs:
           --json cargo-report.json
           --sarif cargo-report.sarif
           --cache-file .dep-gate-cache.json
+
+      - name: Save OSV hydration cache
+        if: always() # must run even when a scan step above fails - see the restore step's comment
+        uses: actions/cache/save@v4
+        with:
+          path: .dep-gate-cache.json
+          key: dep-gate-osv-cache-${{ github.run_id }}
 
       - name: Upload vulnerability report
         if: always()

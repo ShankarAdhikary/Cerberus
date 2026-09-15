@@ -199,15 +199,18 @@ security review (network egress is auditable to one file).
   `--cache-file`, behavior is unchanged from before this feature existed
   (always fetches every vuln ID fresh).
 - For persistence *across* CI runs (the actual point of this cache),
-  the workflow must restore/save the cache file itself, e.g. via
-  `actions/cache` keyed on a stable key. `actions/cache`'s `save-always`
-  input must be set to `true` — its default (`false`) only saves the
-  cache when the *job* succeeds, but this gate's job legitimately fails
-  on real findings, and a PR sitting on an unfixed vulnerability across
+  the workflow must restore/save the cache file itself. `security-scan.yml`
+  uses split `actions/cache/restore@v4` + `actions/cache/save@v4` steps
+  (not the combined `actions/cache@v4` action) specifically so the save
+  step can carry `if: always()` — this gate's job legitimately fails on
+  real findings, and a PR sitting on an unfixed vulnerability across
   repeated pushes is exactly the case that most needs a persisted cache.
-  Confirmed live in `security-scan.yml`: without `save-always: true`,
-  a real failing run's cache was silently never saved, so the next
-  run's `restore-keys` found nothing.
+  The combined action's own `save-always` input looks like the obvious
+  fix but is deprecated and, confirmed live across three real runs in
+  this project's own demo PR, does not actually save anything — "Cache
+  not found" persisted even with `save-always: true` set. The
+  restore/save split is what GitHub's own deprecation notice points at
+  as the replacement, and it's what was verified live to actually work.
 
 ### 2.9 GitHub API client module (`github_client.py`)
 - This is the tool's SECOND (and, per PRD.md's zero-telemetry NFR, only
