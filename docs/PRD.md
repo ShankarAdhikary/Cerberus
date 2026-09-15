@@ -30,10 +30,17 @@ not a dashboard to check manually.
 1. **PR gate**: On every pull request that touches a lockfile, block the
    merge if a newly introduced or version-bumped dependency has a
    HIGH/CRITICAL vulnerability.
-2. **Full audit**: On a schedule (e.g. nightly `cron`), scan the entire
-   lockfile — not just the diff — to catch vulnerabilities disclosed
-   *after* a dependency was already merged in (this is why diff-only mode
-   is opt-in, not the default).
+2. **Full audit**: On every push to the default branch (`security-scan.yml`'s
+   `push: branches: [main]` trigger — a nightly `cron` would work the same
+   way but wasn't needed here), scan the entire lockfile — not just the
+   diff — to catch vulnerabilities disclosed *after* a dependency was
+   already merged in (this is why diff-only mode is opt-in, not the
+   default, and why it's used only for the `pull_request` trigger, not
+   `push`). This also doubles as the baseline scan GitHub's code-scanning
+   alerts need: a PR's code-scanning check only ever reports findings as
+   "new" relative to the last analysis on the default branch, so without
+   this a PR's SARIF upload silently never surfaces as a visible alert —
+   confirmed live before this trigger was added.
 3. **Local pre-commit check**: A developer runs the CLI locally before
    opening a PR to get the same signal CI will give them, without
    waiting on a pipeline.
