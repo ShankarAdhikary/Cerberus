@@ -1,0 +1,12 @@
+[
+  {
+    "package": "lodash",
+    "version": "4.17.15",
+    "ecosystem": "npm",
+    "vuln_id": "GHSA-high-0001",
+    "severity": "HIGH",
+    "cvss_score": 7.5,
+    "fixed_version": "4.17.19",
+    "summary": "A high severity issue"
+  }
+]

@@ -25,6 +25,7 @@ on:
 permissions:
   contents: read
   security-events: write # required to upload SARIF to code scanning
+  pull-requests: write # required for --pr-comment (pull_request events only)
 
 jobs:
   scan:
@@ -60,52 +61,35 @@ jobs:
           restore-keys: |
             dep-gate-osv-cache-
 
-      - name: Scan npm lockfile (new/changed deps only)
-        if: hashFiles('package-lock.json') != ''
-        run: >
-          python -m dep_gate.cli
-          --file package-lock.json
-          --fail-on high
-          ${{ github.event_name == 'pull_request' && format('--diff-only --base-ref origin/{0}', github.base_ref) || '' }}
-          --json npm-report.json
-          --sarif npm-report.sarif
-          --cache-file .dep-gate-cache.json
-
-      - name: Scan Python requirements (new/changed deps only)
-        if: hashFiles('requirements.txt') != ''
-        run: >
-          python -m dep_gate.cli
-          --file requirements.txt
-          --fail-on high
-          ${{ github.event_name == 'pull_request' && format('--diff-only --base-ref origin/{0}', github.base_ref) || '' }}
-          --json python-report.json
-          --sarif python-report.sarif
-          --cache-file .dep-gate-cache.json
-
-      - name: Scan Go go.sum (new/changed deps only)
-        if: hashFiles('go.sum') != ''
-        run: >
-          python -m dep_gate.cli
-          --file go.sum
-          --fail-on high
-          ${{ github.event_name == 'pull_request' && format('--diff-only --base-ref origin/{0}', github.base_ref) || '' }}
-          --json go-report.json
-          --sarif go-report.sarif
-          --cache-file .dep-gate-cache.json
-
-      - name: Scan Rust Cargo.lock (new/changed deps only)
-        if: hashFiles('Cargo.lock') != ''
-        run: >
-          python -m dep_gate.cli
-          --file Cargo.lock
-          --fail-on high
-          ${{ github.event_name == 'pull_request' && format('--diff-only --base-ref origin/{0}', github.base_ref) || '' }}
-          --json cargo-report.json
-          --sarif cargo-report.sarif
-          --cache-file .dep-gate-cache.json
+      # One combined invocation across every lockfile present, not one
+      # step per ecosystem - --file is repeatable (see TechSpec.md §2.10),
+      # and this is what makes --pr-comment usable at all here: separate
+      # per-ecosystem invocations would each find-and-overwrite the same
+      # idempotent PR comment, so the final comment would only ever
+      # reflect whichever ecosystem's step happened to run last, silently
+      # dropping findings from the others (this was a known, documented
+      # gap - see Tracker.md - until multi-file support existed).
+      - name: Scan lockfiles (new/changed deps only)
+        if: hashFiles('package-lock.json', 'requirements.txt', 'go.sum', 'Cargo.lock') != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          FILES=()
+          [ -f package-lock.json ] && FILES+=(--file package-lock.json)
+          [ -f requirements.txt ] && FILES+=(--file requirements.txt)
+          [ -f go.sum ] && FILES+=(--file go.sum)
+          [ -f Cargo.lock ] && FILES+=(--file Cargo.lock)
+          python -m dep_gate.cli \
+            "${FILES[@]}" \
+            --fail-on high \
+            ${{ github.event_name == 'pull_request' && format('--diff-only --base-ref origin/{0}', github.base_ref) || '' }} \
+            --json report.json \
+            --sarif report.sarif \
+            --cache-file .dep-gate-cache.json \
+            ${{ github.event_name == 'pull_request' && format('--pr-comment --github-repo {0} --github-pr-number {1}', github.repository, github.event.pull_request.number) || '' }}
 
       - name: Save OSV hydration cache
-        if: always() # must run even when a scan step above fails - see the restore step's comment
+        if: always() # must run even when the scan step above fails - see the restore step's comment
         uses: actions/cache/save@v4
         with:
           path: .dep-gate-cache.json
@@ -116,13 +100,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dependency-vulnerability-report
-          path: "*-report.json"
+          path: report.json
           if-no-files-found: ignore
 
       - name: Upload SARIF to code scanning
         if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: .
+          sarif_file: report.sarif
           category: dep-gate
         continue-on-error: true # a scan-step failure above must not be masked by this step

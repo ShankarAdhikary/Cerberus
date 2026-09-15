@@ -65,6 +65,13 @@ same information as `(source: {source})` at the end of each line. In
 both cases this is purely additive: `--verbose` never changes a finding's
 severity, fix recommendation, or the scan's exit code.
 
+With multiple `--file` given, a **File** column is appended right after
+Fix (before Source, if `--verbose` is also set) showing which lockfile
+each row came from. Like the Source column, it's appended only when
+relevant — a single `--file` never gets a File column, keeping the base
+five-column table exactly as it always was. The plain-text fallback
+appends `({source_file})`.
+
 With `--ignore-file`, a finding matched by an active suppression stays in
 the table (never hidden — see PRD.md's auditability requirement) but its
 **Severity** cell gets a `(suppressed)` suffix, e.g. `HIGH (suppressed)`
@@ -98,7 +105,9 @@ the full lockfile.
 
 ## 4. GitHub PR Comment Design (`--pr-comment`, opt-in)
 
-`github_client.render_pr_comment()` produces this exact structure:
+`github_client.render_pr_comment()` produces this exact structure for a
+**single-file** scan (one `--file`) — unchanged from before multi-file
+support existed:
 
 ```markdown
 ## 🔒 Dependency Vulnerability Gate
@@ -120,12 +129,52 @@ the full lockfile.
 </details>
 ```
 
+For a **multi-file** scan (`--file` given more than once), the findings
+table is split into one `### \`file\`` subheading per source file — this
+is what makes a single combined comment across every scanned lockfile
+possible without one file's findings silently overwriting another's, and
+is the actual point of multi-file support existing (see PRD.md / Tracker.md
+for the "each `dep_gate.cli` invocation was overwriting the previous one's
+comment" gap this closes):
+
+```markdown
+## 🔒 Dependency Vulnerability Gate
+
+**Result:** ❌ Failed — 2 finding(s) at or above `high`
+
+### `package-lock.json`
+
+| Severity | Package | Vuln ID | Fix |
+|---|---|---|---|
+| 🔴 CRITICAL | `lodash@4.17.15` | GHSA-yyyy | Upgrade to `4.17.19` |
+
+### `requirements.txt`
+
+| Severity | Package | Vuln ID | Fix |
+|---|---|---|---|
+| 🟠 HIGH | `requests@2.25.0` | GHSA-xxxx | Upgrade to `2.31.0` |
+
+<details>
+<summary>Scan details</summary>
+
+- Scanned: `package-lock.json` (12 dependencies), `requirements.txt` (35 dependencies)
+- Threshold: `--fail-on high`
+- Full report: see the `dependency-vulnerability-report` build artifact
+
+</details>
+```
+
 Design rules for this comment (enforced by `render_pr_comment()`/`upsert_comment()`):
 - The comment is **idempotent per-PR** — `upsert_comment()` finds the
   existing bot comment via a hidden `COMMENT_MARKER` and `PATCH`es it on
-  re-runs, rather than appending a new comment on every push.
-- The `<details>` block keeps the comment short by default; the table
-  above the fold shows only blocking findings, not every `LOW`/`UNKNOWN`
+  re-runs, rather than appending a new comment on every push. This holds
+  identically for a multi-file scan: it's still exactly one comment,
+  covering every file, found and updated the same way.
+- Subheadings appear in first-seen file order (the order `--file` was
+  given), not sorted alphabetically — matches the order the scan steps
+  and terminal table already use.
+- The `<details>` block keeps the comment short by default; the table(s)
+  above the fold show only blocking findings, not every `LOW`/`UNKNOWN`
   finding.
 - Never include a raw CVSS vector string in the comment body — it's
   noise for a non-security reviewer; the severity word and score are

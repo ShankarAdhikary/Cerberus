@@ -55,7 +55,7 @@ not when the code merely runs once locally.
 
 ## In Progress
 
-- [ ] *(none currently — update this section when work starts)*
+- [ ] Multi-file `--file` support: scan multiple lockfiles in one `cli.py` invocation, one combined JSON/SARIF/SBOM/PR-comment output, so `--pr-comment` can be wired into the real multi-ecosystem workflow without one file's comment overwriting another's
 
 ## Blocked
 
