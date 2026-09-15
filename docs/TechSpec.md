@@ -396,6 +396,23 @@ internal dataclasses.
 
 ## 5. Packaging & Distribution
 
+- **PyPI package name: `dep-vuln-gate`, not `dep-gate`.** `dep-gate` was
+  the original choice and passed the obvious availability check
+  (`GET https://pypi.org/pypi/dep-gate/json` → `404`, confirmed before
+  committing to it) — but that check only proves the *exact* name is
+  unclaimed, not that PyPI's upload-time validator will accept it. The
+  real upload was rejected: `400 The name 'dep-gate' is too similar to
+  an existing project` — PyPI normalizes away hyphens/case when checking
+  similarity, and an unrelated existing package, `depgate` (a dependency-
+  confusion/supply-chain-risk detector, thematically adjacent but not
+  the same tool), already claims that normalized form. There is no
+  practical way to discover this in advance short of attempting the
+  upload — the JSON API has no "similar names" endpoint. `dep-vuln-gate`
+  (matching this repo's own directory name) was checked and clear, and
+  the upload succeeded under it. The **console command** stays `dep-gate`
+  (`[project.scripts]` isn't required to match `[project.name]`) - only
+  the `pip install <name>` target changed, not what a user actually
+  types to run the tool.
 - **Build backend: hatchling**, not setuptools. No concrete reason to
   prefer setuptools existed (no C extensions, no complex package-data
   rules), and hatchling's `[tool.hatch.version]` reads `__version__`
@@ -432,9 +449,10 @@ internal dataclasses.
   real build - see Tracker.md for the exact file lists observed). A
   package artifact ships the importable code and the metadata a PyPI
   listing needs, not the whole repository.
-- **Distribution path**: `pip install git+https://github.com/<owner>/<repo>.git@<tag>`
-  is the verified minimum bar (works with zero PyPI involvement, using
-  only a git tag). Real PyPI/TestPyPI publication requires an account
-  and API token this agent does not have access to — see Tracker.md for
-  what was and wasn't verified, and confirm with whoever holds those
-  credentials before treating PyPI installability as proven.
+- **Distribution paths, both verified end-to-end in clean venvs**:
+  `pip install dep-vuln-gate` (real PyPI — https://pypi.org/project/dep-vuln-gate/)
+  and `pip install git+https://github.com/<owner>/<repo>.git@<tag>` (zero
+  PyPI involvement, only a git tag). Both were confirmed with a real
+  install, `dep-gate --help`, and a real live OSV.dev scan against a
+  known-vulnerable pin producing the correct findings and exit code — see
+  Tracker.md for the exact commands and output.
