@@ -7,6 +7,20 @@ on:
       - "requirements.txt"
       - "go.sum"
       - "Cargo.lock"
+  push:
+    branches: [main]
+    paths:
+      - "package-lock.json"
+      - "requirements.txt"
+      - "go.sum"
+      - "Cargo.lock"
+    # A push-to-main run scans the WHOLE lockfile (no --diff-only - there's
+    # no PR base ref on a push event) and is what GitHub's code-scanning
+    # alerts need as a baseline: PR runs only ever report findings as "new"
+    # relative to the last analysis on the default branch, so without at
+    # least one scan having landed on main, a PR's code-scanning check
+    # reports "no new alerts" even when the SARIF it uploaded has real
+    # findings in it - confirmed live in this project's own demo PR.
 
 permissions:
   contents: read
@@ -52,7 +66,7 @@ jobs:
           python -m dep_gate.cli
           --file package-lock.json
           --fail-on high
-          --diff-only --base-ref origin/${{ github.base_ref }}
+          ${{ github.event_name == 'pull_request' && format('--diff-only --base-ref origin/{0}', github.base_ref) || '' }}
           --json npm-report.json
           --sarif npm-report.sarif
           --cache-file .dep-gate-cache.json
@@ -63,7 +77,7 @@ jobs:
           python -m dep_gate.cli
           --file requirements.txt
           --fail-on high
-          --diff-only --base-ref origin/${{ github.base_ref }}
+          ${{ github.event_name == 'pull_request' && format('--diff-only --base-ref origin/{0}', github.base_ref) || '' }}
           --json python-report.json
           --sarif python-report.sarif
           --cache-file .dep-gate-cache.json
@@ -74,7 +88,7 @@ jobs:
           python -m dep_gate.cli
           --file go.sum
           --fail-on high
-          --diff-only --base-ref origin/${{ github.base_ref }}
+          ${{ github.event_name == 'pull_request' && format('--diff-only --base-ref origin/{0}', github.base_ref) || '' }}
           --json go-report.json
           --sarif go-report.sarif
           --cache-file .dep-gate-cache.json
@@ -85,7 +99,7 @@ jobs:
           python -m dep_gate.cli
           --file Cargo.lock
           --fail-on high
-          --diff-only --base-ref origin/${{ github.base_ref }}
+          ${{ github.event_name == 'pull_request' && format('--diff-only --base-ref origin/{0}', github.base_ref) || '' }}
           --json cargo-report.json
           --sarif cargo-report.sarif
           --cache-file .dep-gate-cache.json

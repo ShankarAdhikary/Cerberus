@@ -151,8 +151,15 @@ spins up real temporary git repositories rather than mocking `git`.
 
 ## CI integration
 
-See `.github/workflows/security-scan.yml` — runs on every PR that touches
-either lockfile and uploads the JSON report as a build artifact.
+See `.github/workflows/security-scan.yml`. Two triggers:
+- **`pull_request`** — diff-only scan of whatever lockfile(s) the PR
+  touches; uploads the JSON report as a build artifact and the SARIF
+  report to code scanning.
+- **`push` to `main`** — full (non-diff) scan on every merge. This isn't
+  just belt-and-suspenders: GitHub's code-scanning alerts only report a
+  PR's findings as "new" relative to the last analysis on the default
+  branch, so without this trigger a PR's SARIF upload silently never
+  shows up as a visible alert, even though it succeeds.
 
 ## Known limitations / good next steps
 

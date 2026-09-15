@@ -340,3 +340,14 @@ internal dataclasses.
   shallow clone will cause `git show <base_ref>:<file>` to fail with a
   non-zero exit that `diff.py` must surface as `GitDiffError`, not a
   silent empty diff.
+- `security-scan.yml` runs `--diff-only` only for the `pull_request`
+  trigger (`github.event_name == 'pull_request'`, via a GitHub Actions
+  expression in the `run:` block, since `github.base_ref` doesn't exist
+  on a `push` event); the `push: branches: [main]` trigger runs a full,
+  non-diff scan instead. This full scan on `main` isn't optional
+  polish — GitHub's code-scanning alerts only ever report a PR's
+  findings as "new" relative to the last analysis on the default
+  branch, so without at least one scan having landed on `main`, a PR's
+  SARIF upload succeeds but never surfaces as a visible alert. Confirmed
+  live: a real PR's code-scanning check reported "No new alerts" despite
+  its own SARIF containing 8 real findings, until this trigger existed.
