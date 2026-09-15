@@ -250,12 +250,10 @@ security review (network egress is auditable to one file).
   not a replacement for the terminal/JSON/SARIF report.
 - **Verification note**: `render_pr_comment()`, `find_existing_comment_id()`,
   and `upsert_comment()` are unit-tested against a mocked
-  `requests.Session` (same pattern as `osv_client.py`'s tests). Unlike
-  every other network-touching feature in this project, this one has
-  **not** been exercised against the real GitHub API in this
-  session — no live repo/PR/token was available to verify against, so
-  treat the live integration (as opposed to the tested logic) as
-  unverified until it's run for real.
+  `requests.Session` (same pattern as `osv_client.py`'s tests), and have
+  since also been run for real against `ShankarAdhikary/Cerberus#1` —
+  idempotent create and update both confirmed live (see Tracker.md for
+  the exact comment IDs/timestamps observed).
 
 ### 2.10 Entry point / Reporter (`cli.py`)
 - Owns `argparse` definition, orchestration order, exit-code decisions,
@@ -264,6 +262,50 @@ security review (network egress is auditable to one file).
 - Rich is an optional import — the CLI must run correctly (with plain
   `print()` output) even in a minimal environment where `rich` isn't
   installed, since CI runners may cache a stale `requirements.txt`.
+- **Multi-file `--file` support**: `--file` is repeatable
+  (`action="append"`, `dest="files"`) rather than `nargs="+"` — chosen
+  because repeated flags read unambiguously next to every other flag in
+  a long invocation (no risk of a following bare value being swallowed
+  as another file, which `nargs="+"` is prone to without a `--`
+  separator), and it matches how the CI workflow already lists one
+  concept per line. `run()` resolves every file's dependency list up
+  front in a loop, **failing fast on the first usage error** — if file 2
+  of 3 fails to parse, `run()` returns `2` immediately without ever
+  calling `osv_client`, rather than scanning file 1, reporting on it,
+  and only then discovering file 2 is broken (AppFlow.md §2's exit-code
+  contract requires this explicitly).
+  - **Byte-compatibility with a single `--file`** (Rules.md: docs stay
+    authoritative for behavior that must not regress) is achieved by
+    gating every multi-file-only addition behind `multi_file = len(args.files) > 1`:
+    a single-file run never adds a `source_file` key to any finding, never
+    adds a "File" column to the table, and calls `sarif.build_sarif(findings,
+    args.files[0])` exactly as before (passing the one file positionally, the
+    same as the old single-argument call) — so its JSON/SARIF/SBOM output is
+    identical to pre-multi-file output down to the byte. This is enforced by
+    `tests/test_backward_compat.py`, which diffs live output against a golden
+    fixture captured from the actual pre-refactor code, not just fresh
+    assertions written after the fact.
+  - **Multi-file** run: every dependency gets tagged `dep["source_file"] =
+    file_path` right after that file's own parse/diff step (`cli.py` does
+    this tagging itself - `lockfile.py`/`diff.py` are untouched and know
+    nothing about multi-file scans). Findings inherit `source_file` from
+    their dependency. `sbom.build_sbom()` needs no change at all - it never
+    reads `source_file` and a CycloneDX inventory has no natural per-file
+    concept to add one for (not requested, not added). `sarif.build_sarif()`
+    is called with `scanned_file=None`, so every result falls back to its own
+    finding's `source_file` instead of one global filename (see `sarif.py`'s
+    docstring for the exact fallback rule).
+  - **Exit-code aggregation** (AppFlow.md §2) falls out of the existing
+    single-pass logic without any extra aggregation code: `blocking` is
+    already computed from the *combined* findings list across all files, so
+    "exit 1 if ANY file has a blocking finding" is just what iterating the
+    union already does; "exit 0 only if every file is clean" is the same
+    computation in the other direction. The only genuinely new control flow
+    is the fail-fast parse loop described above.
+  - **`--pr-comment`** now groups blocking findings under a `### \`file\``
+    subheading per source file when `len(scanned) > 1` (see
+    `github_client.render_pr_comment()`'s docstring) - with exactly one
+    file, it renders the flat table it always has, unchanged.
 
 ## 3. OSV.dev Integration Details
 

@@ -25,9 +25,17 @@ pip install -r requirements.txt
 
 python -m dep_gate.cli --file package-lock.json --fail-on high
 python -m dep_gate.cli --file requirements.txt --fail-on critical --json report.json
+
+# --file is repeatable: scan multiple lockfiles in one invocation, with
+# one combined JSON/SARIF/SBOM/PR-comment output instead of one per file.
+python -m dep_gate.cli --file package-lock.json --file requirements.txt --fail-on high
 ```
 
 Flags:
+- `--file PATH` — required, **repeatable**. Path to a lockfile
+  (`package-lock.json`, `requirements.txt`, `go.sum`, `Cargo.lock`).
+  Repeat it to scan several in one run; a single `--file` behaves exactly
+  as it always has.
 - `--fail-on {low,moderate,high,critical}` — minimum severity that blocks the build.
 - `--json PATH` — also write a machine-readable report.
 - `--fail-open` — exit `0` instead of `1` if OSV.dev is unreachable (off by
@@ -67,7 +75,8 @@ Flags:
 #   permissions:
 #     pull-requests: write
 - run: >
-    python -m dep_gate.cli --file package-lock.json --fail-on high
+    python -m dep_gate.cli --file package-lock.json --file requirements.txt
+    --fail-on high
     --pr-comment
     --github-repo ${{ github.repository }}
     --github-pr-number ${{ github.event.pull_request.number }}
@@ -75,15 +84,15 @@ Flags:
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-**Not wired into `security-scan.yml` below**: that workflow scans up to
-four lockfiles in separate steps, and each `--pr-comment` invocation
-finds-and-overwrites the *same* bot comment via its idempotency marker —
-running it after every step would leave the comment reflecting only the
-last ecosystem scanned, not the combined picture, which is worse than no
-comment at all. Wiring this in for real needs one CLI invocation that
-scans every changed lockfile and comments once with the combined
-findings — out of scope for the current one-file-per-invocation `cli.py`
-design. The snippet above is for a single-lockfile repo/workflow.
+This is exactly what `security-scan.yml` below does: one combined
+invocation across every lockfile present, so `--pr-comment` posts a
+single comment covering all of them (grouped by file — see Design.md §4)
+instead of one ecosystem's `--pr-comment` call finding-and-overwriting
+another's. (An earlier version of this project ran one `dep_gate.cli`
+invocation per ecosystem, which made `--pr-comment` impossible to wire in
+safely — each invocation would've silently dropped every other
+ecosystem's findings from the comment. Multi-file `--file` support fixed
+that at the root, rather than working around it.)
 
 ## Suppressing accepted-risk findings
 
@@ -167,8 +176,6 @@ See `.github/workflows/security-scan.yml`. Two triggers:
   covers Maven, RubyGems, Packagist, etc. — the same batch/hydrate client
   works for those, you'd just need lockfile parsers for each.
 - SPDX SBOM format not supported (CycloneDX is).
-- `--pr-comment` isn't wired into the multi-ecosystem PR-gate workflow
-  below — see that section for why.
 
 ## License
 

@@ -48,7 +48,7 @@ def _fake_response(status_code: int = 200, json_data=None, headers=None) -> Magi
 def test_render_pr_comment_failed_scan_shows_only_blocking_findings() -> None:
     body = render_pr_comment(
         blocking=[BLOCKING_FINDING],
-        scanned_count=47,
+        scanned=[("package-lock.json", 47)],
         fail_on="high",
         diff_mode=True,
         base_ref="origin/main",
@@ -64,7 +64,11 @@ def test_render_pr_comment_failed_scan_shows_only_blocking_findings() -> None:
 
 def test_render_pr_comment_passed_scan_has_no_findings_table_row() -> None:
     body = render_pr_comment(
-        blocking=[], scanned_count=10, fail_on="high", diff_mode=False, base_ref=None
+        blocking=[],
+        scanned=[("package-lock.json", 10)],
+        fail_on="high",
+        diff_mode=False,
+        base_ref=None,
     )
 
     assert "✅ Passed" in body
@@ -74,7 +78,11 @@ def test_render_pr_comment_passed_scan_has_no_findings_table_row() -> None:
 def test_render_pr_comment_never_includes_raw_cvss_vector() -> None:
     finding = dict(BLOCKING_FINDING, cvss_vector="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H")
     body = render_pr_comment(
-        blocking=[finding], scanned_count=1, fail_on="high", diff_mode=False, base_ref=None
+        blocking=[finding],
+        scanned=[("package-lock.json", 1)],
+        fail_on="high",
+        diff_mode=False,
+        base_ref=None,
     )
 
     assert "CVSS:3.1" not in body
@@ -82,7 +90,11 @@ def test_render_pr_comment_never_includes_raw_cvss_vector() -> None:
 
 def test_render_pr_comment_mentions_diff_mode_base_ref() -> None:
     body = render_pr_comment(
-        blocking=[], scanned_count=5, fail_on="high", diff_mode=True, base_ref="origin/main"
+        blocking=[],
+        scanned=[("package-lock.json", 5)],
+        fail_on="high",
+        diff_mode=True,
+        base_ref="origin/main",
     )
 
     assert "diff-only vs `origin/main`" in body
@@ -91,7 +103,11 @@ def test_render_pr_comment_mentions_diff_mode_base_ref() -> None:
 def test_render_pr_comment_no_fix_shown_as_no_fix_yet() -> None:
     finding = dict(BLOCKING_FINDING, fixed_version=None)
     body = render_pr_comment(
-        blocking=[finding], scanned_count=1, fail_on="high", diff_mode=False, base_ref=None
+        blocking=[finding],
+        scanned=[("package-lock.json", 1)],
+        fail_on="high",
+        diff_mode=False,
+        base_ref=None,
     )
 
     assert "no fix yet" in body

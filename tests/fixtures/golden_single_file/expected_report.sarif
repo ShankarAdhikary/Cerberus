@@ -1,0 +1,41 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "dep-gate",
+          "informationUri": "https://osv.dev",
+          "rules": [
+            {
+              "id": "GHSA-high-0001",
+              "shortDescription": {
+                "text": "GHSA-high-0001"
+              },
+              "helpUri": "https://osv.dev/vulnerability/GHSA-high-0001"
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "GHSA-high-0001",
+          "level": "error",
+          "message": {
+            "text": "HIGH: lodash@4.17.15 is affected by GHSA-high-0001 (upgrade to 4.17.19)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "PLACEHOLDER_PATH"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

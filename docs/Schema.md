@@ -63,6 +63,16 @@ displayed in the findings table.
     "suppressed": bool,             # OPTIONAL: only present when --ignore-file is set
     "suppression_reason": str | None,  # OPTIONAL: only present when --ignore-file is set;
                                         # the matching Suppression.reason, or None if not suppressed
+    "source_file": str,             # OPTIONAL: only present when --file was given more than
+                                     # once (a multi-file scan) - which lockfile this finding
+                                     # came from. Deliberately absent on a single-file scan
+                                     # (verbatim `args.files[0]`, not present at all as a key)
+                                     # rather than always-present-but-usually-trivial: a field
+                                     # that's the same value on every record for the overwhelming
+                                     # majority of invocations (anyone scanning one lockfile) adds
+                                     # noise for zero information, and Rules.md's byte-compat
+                                     # contract for the single-file case requires it be absent
+                                     # anyway - see TechSpec.md §2.10.
 }
 ```
 
@@ -83,6 +93,7 @@ class Vulnerability(BaseModel):
     source: Optional[str] = None  # only set when --verbose is passed
     suppressed: Optional[bool] = None  # only set when --ignore-file is passed
     suppression_reason: Optional[str] = None  # only set when --ignore-file is passed
+    source_file: Optional[str] = None  # only set on a multi-file scan (--file given 2+ times)
 ```
 
 ## 3. `Severity` (evaluator output, before assembly into a Vulnerability)

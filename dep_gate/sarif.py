@@ -39,7 +39,13 @@ def _rule(vuln_id: str) -> dict:
     }
 
 
-def _result(finding: dict, scanned_file: str) -> dict:
+def _result(finding: dict, scanned_file: str | None) -> dict:
+    # A multi-file scan tags each finding with its own source_file (see
+    # cli.py); that wins when present. A single-file scan never tags
+    # findings at all, so every result falls back to the one `scanned_file`
+    # the caller passed - this is what keeps single-file SARIF output
+    # byte-identical to before multi-file support existed.
+    location_file = finding.get("source_file") or scanned_file
     fix = finding.get("fixed_version")
     fix_text = f"upgrade to {fix}" if fix else "no fix published yet"
     message = (
@@ -50,7 +56,7 @@ def _result(finding: dict, scanned_file: str) -> dict:
         "ruleId": finding["vuln_id"],
         "level": _LEVEL_BY_SEVERITY.get(finding["severity"], "note"),
         "message": {"text": message},
-        "locations": [{"physicalLocation": {"artifactLocation": {"uri": scanned_file}}}],
+        "locations": [{"physicalLocation": {"artifactLocation": {"uri": location_file}}}],
     }
     if finding.get("suppressed"):
         result["suppressions"] = [
@@ -59,8 +65,15 @@ def _result(finding: dict, scanned_file: str) -> dict:
     return result
 
 
-def build_sarif(findings: list[dict], scanned_file: str) -> dict:
-    """Build a SARIF document (as a plain dict, ready for json.dump)."""
+def build_sarif(findings: list[dict], scanned_file: str | None = None) -> dict:
+    """
+    Build a SARIF document (as a plain dict, ready for json.dump).
+
+    `scanned_file` is the fallback location for findings that don't carry
+    their own `source_file` (the single-file case - see `_result()`). For
+    a multi-file scan, pass `None` and tag every finding with `source_file`
+    instead, so each result points at the lockfile it actually came from.
+    """
     rules: dict[str, dict] = {}
     results = []
     for finding in findings:

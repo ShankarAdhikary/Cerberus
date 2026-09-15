@@ -68,9 +68,21 @@ def _request_with_retries(
     raise RuntimeError(f"GitHub API request failed after {MAX_RETRIES} attempts: {last_exc}")
 
 
+def _findings_table(findings: list[dict]) -> list[str]:
+    rows = ["| Severity | Package | Vuln ID | Fix |", "|---|---|---|---|"]
+    for f in findings:
+        emoji = _EMOJI_BY_SEVERITY.get(f["severity"], "")
+        fix = f"Upgrade to `{f['fixed_version']}`" if f.get("fixed_version") else "no fix yet"
+        rows.append(
+            f"| {emoji} {f['severity']} | `{f['package']}@{f['version']}` | "
+            f"{f['vuln_id']} | {fix} |"
+        )
+    return rows
+
+
 def render_pr_comment(
     blocking: list[dict],
-    scanned_count: int,
+    scanned: list[tuple[str, int]],
     fail_on: str,
     diff_mode: bool,
     base_ref: str | None,
@@ -80,6 +92,17 @@ def render_pr_comment(
     no I/O - shows only *blocking* findings above the fold (not every
     LOW/UNKNOWN finding), and never includes a raw CVSS vector string,
     per that same design rule.
+
+    `scanned` is one `(file_path, dependency_count)` pair per lockfile
+    scanned. With exactly one entry, the comment renders exactly as it
+    did before multi-file support existed - a single flat table, a single
+    "Scanned: N dependencies" line - since that's the single-file case
+    this project's byte-compat contract covers. With more than one entry,
+    blocking findings are grouped under a "### `file`" subheading each
+    (via each finding's own `source_file`, which `cli.py` only sets in
+    the multi-file case) so a PR touching two lockfiles doesn't lose
+    which file a given row came from, and the scan-details line lists
+    every file's own count.
     """
     if blocking:
         result_line = f"**Result:** ❌ Failed — {len(blocking)} finding(s) at or above `{fail_on}`"
@@ -94,17 +117,26 @@ def render_pr_comment(
     ]
 
     if blocking:
-        lines += ["| Severity | Package | Vuln ID | Fix |", "|---|---|---|---|"]
-        for f in blocking:
-            emoji = _EMOJI_BY_SEVERITY.get(f["severity"], "")
-            fix = f"Upgrade to `{f['fixed_version']}`" if f.get("fixed_version") else "no fix yet"
-            lines.append(
-                f"| {emoji} {f['severity']} | `{f['package']}@{f['version']}` | "
-                f"{f['vuln_id']} | {fix} |"
-            )
-        lines.append("")
+        if len(scanned) > 1:
+            by_file: dict[str, list[dict]] = {}
+            for f in blocking:
+                by_file.setdefault(f.get("source_file", ""), []).append(f)
+            for file_path, file_findings in by_file.items():
+                lines.append(f"### `{file_path}`")
+                lines.append("")
+                lines += _findings_table(file_findings)
+                lines.append("")
+        else:
+            lines += _findings_table(blocking)
+            lines.append("")
 
-    scanned_desc = f"Scanned: {scanned_count} dependencies"
+    if len(scanned) > 1:
+        scanned_desc = "Scanned: " + ", ".join(
+            f"`{file_path}` ({count} dependencies)" for file_path, count in scanned
+        )
+    else:
+        _file_path, count = scanned[0]
+        scanned_desc = f"Scanned: {count} dependencies"
     if diff_mode:
         scanned_desc += f" (diff-only vs `{base_ref}`)"
 

@@ -4,6 +4,10 @@ Dependency Vulnerability Gate - CLI entry point.
 Usage:
     python -m dep_gate.cli --file package-lock.json --fail-on high
     python -m dep_gate.cli --file requirements.txt --fail-on critical --json report.json
+
+    # Multiple lockfiles in one invocation - one combined report/PR comment,
+    # not one per file (see TechSpec.md §2.10 for why --file is repeatable):
+    python -m dep_gate.cli --file package-lock.json --file requirements.txt --fail-on high
 """
 
 from __future__ import annotations
@@ -48,8 +52,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--file",
+        action="append",
+        dest="files",
         required=True,
-        help="Path to package-lock.json, requirements.txt, go.sum, or Cargo.lock",
+        metavar="PATH",
+        help="Path to a package-lock.json, requirements.txt, go.sum, or Cargo.lock. "
+        "Repeatable (--file a --file b) to scan multiple lockfiles in one invocation, "
+        "producing one combined JSON/SARIF/SBOM/PR-comment output instead of one per "
+        "file. A single --file behaves exactly as before multi-file support existed.",
     )
     parser.add_argument(
         "--fail-on",
@@ -153,18 +163,45 @@ def run(argv: list[str] | None = None) -> int:
         )
         return 2
 
-    try:
-        if args.diff_only:
-            deps = diff_module.diff_dependencies(args.file, args.base_ref)
-            _print(f"Diff mode: {len(deps)} new/changed dependency(ies) vs {args.base_ref}.")
-        else:
-            deps = lockfile.parse_lockfile(args.file)
-    except (FileNotFoundError, ValueError) as exc:
-        _print(f"Error reading {args.file}: {exc}")
-        return 2
-    except diff_module.GitDiffError as exc:
-        _print(f"Error computing diff: {exc}")
-        return 2
+    multi_file = len(args.files) > 1
+
+    # Resolve every file's dependency list up front, failing fast on the
+    # FIRST usage error rather than partially scanning some files and
+    # reporting on others - AppFlow.md §2's exit-code contract requires
+    # exit 2 the moment any one file can't be read, not a partial result.
+    per_file_deps: list[tuple[str, list]] = []
+    for file_path in args.files:
+        try:
+            if args.diff_only:
+                file_deps = diff_module.diff_dependencies(file_path, args.base_ref)
+                if multi_file:
+                    _print(
+                        f"Diff mode: {file_path}: {len(file_deps)} new/changed "
+                        f"dependency(ies) vs {args.base_ref}."
+                    )
+                else:
+                    _print(
+                        f"Diff mode: {len(file_deps)} new/changed dependency(ies) "
+                        f"vs {args.base_ref}."
+                    )
+            else:
+                file_deps = lockfile.parse_lockfile(file_path)
+        except (FileNotFoundError, ValueError) as exc:
+            _print(f"Error reading {file_path}: {exc}")
+            return 2
+        except diff_module.GitDiffError as exc:
+            if multi_file:
+                _print(f"Error computing diff for {file_path}: {exc}")
+            else:
+                _print(f"Error computing diff: {exc}")
+            return 2
+
+        if multi_file:
+            for dep in file_deps:
+                dep["source_file"] = file_path
+        per_file_deps.append((file_path, file_deps))
+
+    deps = [dep for _file_path, file_deps in per_file_deps for dep in file_deps]
 
     suppressions: list[suppress_module.Suppression] = []
     if args.ignore_file:
@@ -182,7 +219,12 @@ def run(argv: list[str] | None = None) -> int:
         _print("No dependencies found to scan.")
         return 0
 
-    _print(f"Scanning {len(deps)} dependencies against OSV.dev ...")
+    if multi_file:
+        _print(
+            f"Scanning {len(deps)} dependencies across {len(args.files)} file(s) against OSV.dev ..."
+        )
+    else:
+        _print(f"Scanning {len(deps)} dependencies against OSV.dev ...")
 
     now = time.time()
     cache = cache_module.load_cache(args.cache_file) if args.cache_file else {}
@@ -233,6 +275,8 @@ def run(argv: list[str] | None = None) -> int:
                 "fixed_version": fix,
                 "summary": record.get("summary", ""),
             }
+            if multi_file:
+                finding["source_file"] = dep["source_file"]
             if args.verbose:
                 finding["source"] = sev.source
             if args.ignore_file:
@@ -241,7 +285,7 @@ def run(argv: list[str] | None = None) -> int:
                 finding["suppression_reason"] = match.reason if match else None
             findings.append(finding)
 
-    _report(findings, verbose=args.verbose)
+    _report(findings, verbose=args.verbose, multi_file=multi_file)
 
     suppressed_findings = [f for f in findings if f.get("suppressed")]
     if suppressed_findings:
@@ -255,8 +299,9 @@ def run(argv: list[str] | None = None) -> int:
             json.dump(findings, f, indent=2)
 
     if args.sarif:
+        sarif_doc = sarif_module.build_sarif(findings, None if multi_file else args.files[0])
         with open(args.sarif, "w", encoding="utf-8") as f:
-            json.dump(sarif_module.build_sarif(findings, args.file), f, indent=2)
+            json.dump(sarif_doc, f, indent=2)
 
     threshold_idx = THRESHOLD_ORDER.index(args.fail_on)
     blocking = [
@@ -268,9 +313,10 @@ def run(argv: list[str] | None = None) -> int:
     ]
 
     if args.pr_comment:
+        scanned = [(file_path, len(file_deps)) for file_path, file_deps in per_file_deps]
         body = github_client.render_pr_comment(
             blocking=blocking,
-            scanned_count=len(deps),
+            scanned=scanned,
             fail_on=args.fail_on,
             diff_mode=args.diff_only,
             base_ref=args.base_ref if args.diff_only else None,
@@ -293,7 +339,7 @@ def run(argv: list[str] | None = None) -> int:
     return 0
 
 
-def _report(findings: list, verbose: bool = False) -> None:
+def _report(findings: list, verbose: bool = False, multi_file: bool = False) -> None:
     if not findings:
         return
     if _RICH:
@@ -303,6 +349,8 @@ def _report(findings: list, verbose: bool = False) -> None:
         table.add_column("Severity")
         table.add_column("Vuln ID")
         table.add_column("Fix")
+        if multi_file:
+            table.add_column("File")
         if verbose:
             table.add_column("Source")
         for f in sorted(findings, key=lambda x: x["severity"], reverse=True):
@@ -314,6 +362,8 @@ def _report(findings: list, verbose: bool = False) -> None:
                 f["vuln_id"],
                 f"upgrade to {f['fixed_version']}" if f["fixed_version"] else "no fix yet",
             ]
+            if multi_file:
+                row.append(f.get("source_file", ""))
             if verbose:
                 row.append(f.get("source", ""))
             table.add_row(*row)
@@ -325,6 +375,8 @@ def _report(findings: list, verbose: bool = False) -> None:
             )
             severity_text = f["severity"] + (" (suppressed)" if f.get("suppressed") else "")
             line = f"[{severity_text}] {f['package']}@{f['version']} - {f['vuln_id']} - {fix_msg}"
+            if multi_file:
+                line += f" ({f.get('source_file', '')})"
             if verbose:
                 line += f" (source: {f.get('source', '')})"
             print(line)
