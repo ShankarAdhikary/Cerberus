@@ -224,6 +224,16 @@ security review (network egress is auditable to one file).
   posting a new comment on every push — `Design.md` §4's idempotency
   rule — accepting an optional `requests.Session` for testing, same
   pattern as `osv_client.py`.
+- `_request_with_retries()`: same retry/backoff shape as
+  `osv_client.py`'s function of the same name (`MAX_RETRIES = 3`,
+  `BACKOFF_BASE = 1.0`s, retries on `429`/`5xx`/connection errors/timeouts,
+  raises `RuntimeError` on exhaustion), additionally honoring GitHub's
+  `Retry-After` response header (sent on secondary rate limits) in
+  preference to the fixed backoff schedule when present. Without this, a
+  transient GitHub API hiccup surfaced immediately as a (non-blocking,
+  but noisy) "failed to post PR comment" warning — added after review
+  feedback flagged the missing retry policy as a real gap for anyone
+  running this across many repos/PRs on a low-quota token.
 - A comment-posting failure (network error, bad token, rate limit) is
   caught in `cli.run()` and printed as a warning; it never changes the
   scan's own exit code — per `AppFlow.md` §4, this is additive output,

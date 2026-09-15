@@ -16,12 +16,15 @@ tool; a GitHub App adds infrastructure PRD.md's NFRs explicitly reject).
 
 from __future__ import annotations
 
+import time
 from typing import List, Optional
 
 import requests
 
 API_BASE = "https://api.github.com"
 REQUEST_TIMEOUT = 15
+MAX_RETRIES = 3
+BACKOFF_BASE = 1.0  # seconds, doubles-ish each retry
 
 # Marks our own comment so upsert_comment() can find and update it on a
 # re-run instead of posting a new comment every push - Design.md §4's
@@ -37,6 +40,33 @@ def _headers(token: str) -> dict:
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
     }
+
+
+def _request_with_retries(
+    session: requests.Session, method: str, url: str, **kwargs
+) -> requests.Response:
+    """
+    Same retry/backoff shape as osv_client.py's _request_with_retries, so a
+    transient GitHub API hiccup or secondary rate limit doesn't immediately
+    surface as a (non-blocking, but noisy) "failed to post PR comment"
+    warning. Honors GitHub's `Retry-After` response header when present
+    (GitHub returns this on secondary rate limits) in preference to the
+    fixed backoff schedule.
+    """
+    last_exc = None
+    for attempt in range(MAX_RETRIES):
+        try:
+            resp = session.request(method, url, timeout=REQUEST_TIMEOUT, **kwargs)
+            if resp.status_code == 429 or resp.status_code >= 500:
+                raise requests.HTTPError(f"Retryable status {resp.status_code}", response=resp)
+            resp.raise_for_status()
+            return resp
+        except (requests.ConnectionError, requests.Timeout, requests.HTTPError) as exc:
+            last_exc = exc
+            retry_after = getattr(getattr(exc, "response", None), "headers", {}).get("Retry-After")
+            sleep_for = float(retry_after) if retry_after else BACKOFF_BASE * (2**attempt)
+            time.sleep(sleep_for)
+    raise RuntimeError(f"GitHub API request failed after {MAX_RETRIES} attempts: {last_exc}")
 
 
 def render_pr_comment(
@@ -99,8 +129,7 @@ def find_existing_comment_id(
     """Find our own bot comment on this PR (identified by COMMENT_MARKER), if any."""
     session = session or requests.Session()
     url = f"{API_BASE}/repos/{repo}/issues/{pr_number}/comments"
-    resp = session.get(url, headers=_headers(token), timeout=REQUEST_TIMEOUT)
-    resp.raise_for_status()
+    resp = _request_with_retries(session, "GET", url, headers=_headers(token))
     for comment in resp.json():
         if COMMENT_MARKER in comment.get("body", ""):
             return comment["id"]
@@ -118,9 +147,7 @@ def upsert_comment(
     payload = {"body": body}
     if existing_id is not None:
         url = f"{API_BASE}/repos/{repo}/issues/comments/{existing_id}"
-        resp = session.patch(url, headers=headers, json=payload, timeout=REQUEST_TIMEOUT)
+        _request_with_retries(session, "PATCH", url, headers=headers, json=payload)
     else:
         url = f"{API_BASE}/repos/{repo}/issues/{pr_number}/comments"
-        resp = session.post(url, headers=headers, json=payload, timeout=REQUEST_TIMEOUT)
-
-    resp.raise_for_status()
+        _request_with_retries(session, "POST", url, headers=headers, json=payload)
