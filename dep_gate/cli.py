@@ -45,6 +45,28 @@ def _print(msg: str = "") -> None:
         print(msg)
 
 
+BANNER = r"""
+   ____           _
+  / ___|___ _ __ | |__   ___ _ __ _   _ ___
+ | |   / _ \ '__|| '_ \ / _ \ '__| | | / __|
+ | |__|  __/ |   | |_) |  __/ |  | |_| \__ \
+  \____\___|_|   |_.__/ \___|_|   \__,_|___/
+"""
+
+
+def _print_banner() -> None:
+    style = "bold cyan" if _RICH else None
+    if _RICH:
+        _console.print(BANNER, style=style)
+        _console.print(
+            "  Dependency Vulnerability Gate -- created by Shankar Adhikary\n",
+            style="dim",
+        )
+    else:
+        print(BANNER)
+        print("  Dependency Vulnerability Gate -- created by Shankar Adhikary\n")
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="dep-gate",
@@ -153,6 +175,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 def run(argv: list[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
+    _print_banner()
 
     pr_comment_token = os.environ.get("GITHUB_TOKEN", "")
     if args.pr_comment and (
