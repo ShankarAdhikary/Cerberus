@@ -17,6 +17,7 @@ tool; a GitHub App adds infrastructure PRD.md's NFRs explicitly reject).
 from __future__ import annotations
 
 import time
+from typing import Any
 
 import requests
 
@@ -33,7 +34,7 @@ COMMENT_MARKER = "<!-- dep-gate-pr-comment -->"
 _EMOJI_BY_SEVERITY = {"CRITICAL": "🔴", "HIGH": "🟠", "MODERATE": "🟡", "LOW": "🔵"}
 
 
-def _headers(token: str) -> dict:
+def _headers(token: str) -> dict[str, str]:
     return {
         "Authorization": f"Bearer {token}",
         "Accept": "application/vnd.github+json",
@@ -42,7 +43,7 @@ def _headers(token: str) -> dict:
 
 
 def _request_with_retries(
-    session: requests.Session, method: str, url: str, **kwargs
+    session: requests.Session, method: str, url: str, **kwargs: Any
 ) -> requests.Response:
     """
     Same retry/backoff shape as osv_client.py's _request_with_retries, so a
@@ -68,7 +69,7 @@ def _request_with_retries(
     raise RuntimeError(f"GitHub API request failed after {MAX_RETRIES} attempts: {last_exc}")
 
 
-def _findings_table(findings: list[dict]) -> list[str]:
+def _findings_table(findings: list[dict[str, Any]]) -> list[str]:
     rows = ["| Severity | Package | Vuln ID | Fix |", "|---|---|---|---|"]
     for f in findings:
         emoji = _EMOJI_BY_SEVERITY.get(f["severity"], "")
@@ -81,7 +82,7 @@ def _findings_table(findings: list[dict]) -> list[str]:
 
 
 def render_pr_comment(
-    blocking: list[dict],
+    blocking: list[dict[str, Any]],
     scanned: list[tuple[str, int]],
     fail_on: str,
     diff_mode: bool,
@@ -118,7 +119,7 @@ def render_pr_comment(
 
     if blocking:
         if len(scanned) > 1:
-            by_file: dict[str, list[dict]] = {}
+            by_file: dict[str, list[dict[str, Any]]] = {}
             for f in blocking:
                 by_file.setdefault(f.get("source_file", ""), []).append(f)
             for file_path, file_findings in by_file.items():

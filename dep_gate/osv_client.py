@@ -15,7 +15,7 @@ with a sane timeout to be a good API citizen.
 from __future__ import annotations
 
 import time
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import requests
 
@@ -35,13 +35,13 @@ class Dependency(TypedDict):
     ecosystem: str
 
 
-def _chunked(items: list, size: int):
+def _chunked(items: list[Dependency], size: int):
     for i in range(0, len(items), size):
         yield items[i : i + size]
 
 
 def _request_with_retries(
-    session: requests.Session, method: str, url: str, **kwargs
+    session: requests.Session, method: str, url: str, **kwargs: Any
 ) -> requests.Response:
     last_exc = None
     for attempt in range(MAX_RETRIES):
@@ -60,13 +60,13 @@ def _request_with_retries(
 
 def batch_query(
     dependencies: list[Dependency], session: requests.Session | None = None
-) -> dict[str, set]:
+) -> dict[str, set[str]]:
     """
     Query OSV in batches. Returns a dict mapping a dependency key
     "ecosystem/name@version" -> set of vulnerability IDs affecting it.
     """
     session = session or requests.Session()
-    results: dict[str, set] = {}
+    results: dict[str, set[str]] = {}
 
     for chunk in _chunked(dependencies, MAX_BATCH_SIZE):
         payload = {
@@ -90,13 +90,15 @@ def batch_query(
     return results
 
 
-def hydrate_vulns(vuln_ids: set, session: requests.Session | None = None) -> dict[str, dict]:
+def hydrate_vulns(
+    vuln_ids: set[str], session: requests.Session | None = None
+) -> dict[str, dict[str, Any]]:
     """
     Fetch full vulnerability records for a set of unique OSV/GHSA/PYSEC/etc IDs.
     Each ID is fetched exactly once regardless of how many packages it affects.
     """
     session = session or requests.Session()
-    hydrated: dict[str, dict] = {}
+    hydrated: dict[str, dict[str, Any]] = {}
 
     for vuln_id in vuln_ids:
         resp = _request_with_retries(session, "GET", f"{VULN_ENDPOINT}/{vuln_id}")
