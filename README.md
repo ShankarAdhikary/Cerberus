@@ -1,4 +1,4 @@
-# Dependency Vulnerability Gate
+# Cerberus: Dependency Vulnerability Gate
 
 Created by [Shankar Adhikary](https://github.com/ShankarAdhikary).
 
