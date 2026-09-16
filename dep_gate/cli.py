@@ -424,5 +424,7 @@ def _report(findings: list, verbose: bool = False, multi_file: bool = False) -> 
             print(line)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover - exercised via a subprocess
+    # in tests/test_cli.py (test_module_entrypoint_invokes_run_and_exits_with_its_code),
+    # which coverage.py can't attribute back to this in-process run.
     sys.exit(run())

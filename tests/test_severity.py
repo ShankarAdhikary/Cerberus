@@ -9,7 +9,14 @@ from __future__ import annotations
 
 import pytest
 
-from dep_gate.severity import Severity, assess, fixed_version
+from dep_gate import severity as severity_module
+from dep_gate.severity import (
+    Severity,
+    _level_from_score,
+    _score_from_vector,
+    assess,
+    fixed_version,
+)
 
 CVSS3_HIGH_VECTOR = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"  # base score 7.5 -> HIGH
 CVSS3_CRITICAL_VECTOR = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"  # base score 9.8 -> CRITICAL
@@ -100,6 +107,34 @@ def test_assess_takes_worst_case_across_multiple_severity_entries() -> None:
     result = assess(record)
 
     assert result.level == "CRITICAL"
+
+
+def test_level_from_score_covers_every_bucket() -> None:
+    assert _level_from_score(9.8) == "CRITICAL"
+    assert _level_from_score(7.5) == "HIGH"
+    assert _level_from_score(5.4) == "MODERATE"  # CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:L/A:N
+    assert _level_from_score(1.8) == "LOW"  # CVSS:3.1/AV:L/AC:H/PR:H/UI:R/S:U/C:L/I:N/A:N
+    assert _level_from_score(0.0) == "UNKNOWN"
+
+
+def test_score_from_vector_returns_none_when_cvss3_package_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Mirrors the try/except ImportError degrade-gracefully path at import
+    # time (cvss not installed) - CVSS3 is None, so no vector can be scored.
+    monkeypatch.setattr(severity_module, "CVSS3", None)
+
+    assert _score_from_vector(CVSS3_HIGH_VECTOR) is None
+
+
+def test_score_from_vector_returns_none_for_non_v3_vector_when_cvss2_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A vector that isn't CVSS:3.x falls through to the CVSS2 branch; with
+    # CVSS2 unavailable too, it must degrade to None, not raise.
+    monkeypatch.setattr(severity_module, "CVSS2", None)
+
+    assert _score_from_vector("AV:N/AC:L/Au:N/C:P/I:P/A:P") is None
 
 
 def test_fixed_version_filters_by_matching_package() -> None:
@@ -238,3 +273,23 @@ def test_fixed_version_without_installed_version_keeps_prior_behavior() -> None:
     }
 
     assert fixed_version(record, "npm", "lodash") == "4.17.19"
+
+
+def test_fixed_version_installed_version_predates_range_falls_back_to_all_fixes() -> None:
+    # installed_version (1.0.0) is OLDER than this range's introduced bound
+    # (2.0.0) - the vulnerability wasn't introduced yet at that version, so
+    # it isn't "in range" for this range. With no range containing it,
+    # fixed_version falls back to every matching-package fix rather than
+    # returning None outright.
+    record = {
+        "affected": [
+            {
+                "package": {"ecosystem": "crates.io", "name": "smallvec"},
+                "ranges": [{"events": [{"introduced": "2.0.0"}, {"fixed": "2.5.0"}]}],
+            }
+        ]
+    }
+
+    result = fixed_version(record, "crates.io", "smallvec", installed_version="1.0.0")
+
+    assert result == "2.5.0"

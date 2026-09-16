@@ -129,6 +129,17 @@ def test_parse_go_sum_skips_malformed_lines(tmp_path: Path) -> None:
     assert deps == [{"name": "github.com/pkg/errors", "version": "v0.9.1", "ecosystem": "Go"}]
 
 
+def test_parse_go_sum_skips_blank_lines(tmp_path: Path) -> None:
+    go_sum = tmp_path / "go.sum"
+    go_sum.write_text(
+        "\ngithub.com/pkg/errors v0.9.1 h1:abc=\n\n\n", encoding="utf-8"
+    )
+
+    deps = parse_go_sum(str(go_sum))
+
+    assert deps == [{"name": "github.com/pkg/errors", "version": "v0.9.1", "ecosystem": "Go"}]
+
+
 def test_parse_lockfile_dispatches_go_sum(fixtures_dir: Path) -> None:
     deps = parse_lockfile(str(fixtures_dir / "go.sum"))
 
