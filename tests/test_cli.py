@@ -8,8 +8,11 @@ AppFlow.md §3.
 
 from __future__ import annotations
 
+import builtins
+import importlib
 import json
 import subprocess
+import sys
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -683,6 +686,83 @@ def test_run_diff_only_scans_only_changed_deps(
     assert [d["name"] for d in captured["deps"]] == ["left-pad"]
 
 
+def test_run_diff_only_multi_file_prints_per_file_diff_message(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _run_git(["init", "-b", "main"], repo)
+    _run_git(["config", "user.email", "t@t.com"], repo)
+    _run_git(["config", "user.name", "T"], repo)
+
+    npm_path = repo / "package-lock.json"
+    req_path = repo / "requirements.txt"
+    _write_npm_lockfile(npm_path, {"lodash": "4.17.15"})
+    req_path.write_text("requests==2.6.0\n", encoding="utf-8")
+    _run_git(["add", "package-lock.json", "requirements.txt"], repo)
+    _run_git(["commit", "-m", "base"], repo)
+
+    _write_npm_lockfile(npm_path, {"lodash": "4.17.15", "left-pad": "1.3.0"})
+    _run_git(["add", "package-lock.json"], repo)
+    _run_git(["commit", "-m", "add left-pad"], repo)
+
+    monkeypatch.chdir(repo)
+
+    with (
+        patch.object(cli.osv_client, "batch_query", return_value={}),
+        patch.object(cli.osv_client, "hydrate_vulns", return_value={}),
+    ):
+        exit_code = cli.run(
+            [
+                "--file",
+                "package-lock.json",
+                "--file",
+                "requirements.txt",
+                "--diff-only",
+                "--base-ref",
+                "HEAD~1",
+            ]
+        )
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "Diff mode: package-lock.json: 1 new/changed dependency(ies) vs HEAD~1." in out
+    assert "Diff mode: requirements.txt: 0 new/changed dependency(ies) vs HEAD~1." in out
+
+
+def test_run_diff_only_multi_file_git_error_prints_per_file_message(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    non_repo = tmp_path / "not-a-repo"
+    non_repo.mkdir()
+    npm_path = non_repo / "package-lock.json"
+    req_path = non_repo / "requirements.txt"
+    _write_npm_lockfile(npm_path, {"lodash": "4.17.15"})
+    req_path.write_text("requests==2.6.0\n", encoding="utf-8")
+    monkeypatch.chdir(non_repo)
+
+    def _raise_not_found(*args, **kwargs):
+        raise FileNotFoundError("git not found")
+
+    monkeypatch.setattr(subprocess, "run", _raise_not_found)
+
+    exit_code = cli.run(
+        [
+            "--file",
+            "package-lock.json",
+            "--file",
+            "requirements.txt",
+            "--diff-only",
+            "--base-ref",
+            "HEAD~1",
+        ]
+    )
+
+    assert exit_code == 2
+    out = capsys.readouterr().out
+    assert "Error computing diff for package-lock.json:" in out
+
+
 def test_run_diff_only_outside_git_repo_exits_2(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -700,3 +780,132 @@ def test_run_diff_only_outside_git_repo_exits_2(
     exit_code = cli.run(["--file", "package-lock.json", "--diff-only", "--base-ref", "HEAD~1"])
 
     assert exit_code == 2
+
+
+def test_run_no_file_no_tty_exits_2_without_prompting(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    # A scripted/CI invocation with no --file and no terminal to prompt on
+    # must fail fast, never call input() and hang waiting on stdin.
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: False)
+
+    def _input_should_not_be_called(*args, **kwargs):
+        raise AssertionError("input() must not be called when stdin is not a tty")
+
+    monkeypatch.setattr(builtins, "input", _input_should_not_be_called)
+
+    exit_code = cli.run([])
+
+    assert exit_code == 2
+    assert "--file is required" in capsys.readouterr().out
+
+
+def test_run_interactive_empty_input_exits_2(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(builtins, "input", lambda *a, **k: "   ")
+
+    exit_code = cli.run([])
+
+    assert exit_code == 2
+    assert "no file path entered" in capsys.readouterr().out
+
+
+def test_run_interactive_prompt_scans_the_entered_path(
+    lockfile: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(builtins, "input", lambda *a, **k: str(lockfile))
+
+    key = "npm/lodash@4.17.15"
+    with _patched_osv({key: {"GHSA-high-0001"}}, {"GHSA-high-0001": HIGH_VULN_RECORD}):
+        exit_code = cli.run(["--fail-on", "high"])
+
+    assert exit_code == 1
+    out = capsys.readouterr().out
+    assert "Enter path to lockfile to scan" in out
+    assert "SCAN FAILED" in out
+
+
+def test_run_interactive_prompt_plain_output_path(
+    lockfile: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    # Same interactive flow, but the _RICH-unavailable branch: input() is
+    # called with the prompt as its own argument instead of _console.print()
+    # writing it first.
+    monkeypatch.setattr(cli, "_RICH", False)
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(builtins, "input", lambda *a, **k: str(lockfile))
+
+    key = "npm/lodash@4.17.15"
+    with _patched_osv({key: {"GHSA-high-0001"}}, {"GHSA-high-0001": HIGH_VULN_RECORD}):
+        exit_code = cli.run(["--fail-on", "high"])
+
+    assert exit_code == 1
+    assert "SCAN FAILED" in capsys.readouterr().out
+
+
+def test_run_interactive_prompt_splits_comma_separated_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    npm_file = tmp_path / "package-lock.json"
+    py_file = tmp_path / "requirements.txt"
+    _write_npm_lockfile(npm_file, {"lodash": "4.17.15"})
+    py_file.write_text("requests==2.6.0\n", encoding="utf-8")
+
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(builtins, "input", lambda *a, **k: f" {npm_file} , {py_file} ")
+
+    with (
+        patch.object(cli.osv_client, "batch_query", return_value={}),
+        patch.object(cli.osv_client, "hydrate_vulns", return_value={}),
+    ):
+        exit_code = cli.run([])
+
+    assert exit_code == 0
+
+
+def test_rich_unavailable_at_import_time_falls_back_to_plain_console(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # rich is imported inside a try/except ImportError at module load time
+    # (cli.py:30-38) so the tool still runs, with plain print(), on a stray
+    # environment missing it. Force that ImportError for real by blocking
+    # the actual import machinery, then reload the module - rather than
+    # just asserting on the already-imported state.
+    real_import = builtins.__import__
+
+    def _blocked_import(name, *args, **kwargs):
+        if name == "rich" or name.startswith("rich."):
+            raise ImportError("simulated: rich not installed")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", _blocked_import)
+    try:
+        importlib.reload(cli)
+        assert cli._RICH is False
+        assert cli._console is None
+    finally:
+        # Restore the real import before reloading again, so the module
+        # (shared across the whole test session) ends up back in its
+        # normal rich-available state for every other test.
+        monkeypatch.setattr(builtins, "__import__", real_import)
+        importlib.reload(cli)
+
+    assert cli._RICH is True
+
+
+def test_module_entrypoint_invokes_run_and_exits_with_its_code() -> None:
+    # Exercises `if __name__ == "__main__": sys.exit(run())` for real, via
+    # the same `python -m dep_gate.cli` invocation the README documents -
+    # not just calling run() directly, which never touches that line.
+    result = subprocess.run(
+        [sys.executable, "-m", "dep_gate.cli", "--help"],
+        cwd=str(Path(__file__).resolve().parents[1]),
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert "usage: dep-gate" in result.stdout

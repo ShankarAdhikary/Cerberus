@@ -81,6 +81,29 @@ def test_load_suppressions_rejects_malformed_date(tmp_path: Path) -> None:
         load_suppressions(str(ignore_file))
 
 
+def test_load_suppressions_content_before_any_dash_raises(tmp_path: Path) -> None:
+    # A key: value line before any top-level "- " entry has started -
+    # there's nowhere to put it, so this must raise rather than silently
+    # drop it or attach it to a phantom entry.
+    ignore_file = tmp_path / ".dep-gate-ignore.yml"
+    ignore_file.write_text('vuln_id: GHSA-x\n', encoding="utf-8")
+
+    with pytest.raises(ValueError, match="expected a top-level"):
+        load_suppressions(str(ignore_file))
+
+
+def test_load_suppressions_line_without_colon_raises(tmp_path: Path) -> None:
+    ignore_file = tmp_path / ".dep-gate-ignore.yml"
+    ignore_file.write_text(
+        "- vuln_id: GHSA-x\n  this line has no colon in it\n  expires: 2099-01-01\n"
+        '  reason: "test"\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="key: value"):
+        load_suppressions(str(ignore_file))
+
+
 def test_find_active_suppression_matches_package_scoped_entry(tmp_path: Path) -> None:
     ignore_file = tmp_path / ".dep-gate-ignore.yml"
     ignore_file.write_text(VALID_FILE, encoding="utf-8")

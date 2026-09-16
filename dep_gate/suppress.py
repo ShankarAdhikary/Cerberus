@@ -65,7 +65,10 @@ def load_suppressions(filepath: str) -> list[Suppression]:
             current = {}
             entries.append(current)
             stripped = stripped[2:].strip()
-            if not stripped:
+            if not stripped:  # pragma: no cover - unreachable: the outer
+                # `line.strip()` above already collapsed any "-" followed
+                # only by trailing whitespace down to a bare "-", which
+                # never matches `startswith("- ")` in the first place.
                 continue
 
         if current is None:

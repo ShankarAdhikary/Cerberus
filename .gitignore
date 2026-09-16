@@ -7,3 +7,5 @@ venv/
 *.json.bak
 dist/
 build/
+.coverage
+htmlcov/

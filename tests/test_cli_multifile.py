@@ -249,3 +249,24 @@ def test_run_multi_file_second_file_error_message_names_that_file(
     assert exit_code == 2
     captured = capsys.readouterr()
     assert str(unrecognized) in captured.out
+
+
+def test_run_multi_file_plain_output_tags_each_line_with_source_file(
+    two_lockfiles: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    # Non-rich (plain print) fallback path, multi-file case: each finding
+    # line must be tagged with the file it came from, same as the rich
+    # table's "File" column.
+    monkeypatch.setattr(cli, "_RICH", False)
+    npm_file, py_file = two_lockfiles
+    batch_patch, hydrate_patch = _mocked_osv()
+
+    with batch_patch, hydrate_patch:
+        exit_code = cli.run(
+            ["--file", str(npm_file), "--file", str(py_file), "--fail-on", "high"]
+        )
+
+    assert exit_code == 1
+    out = capsys.readouterr().out
+    assert f"({npm_file})" in out
+    assert f"({py_file})" in out
