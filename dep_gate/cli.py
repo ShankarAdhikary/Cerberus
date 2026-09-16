@@ -46,18 +46,20 @@ def _print(msg: str = "") -> None:
 
 
 BANNER = r"""
-   ____           _
-  / ___|___ _ __ | |__   ___ _ __ _   _ ___
- | |   / _ \ '__|| '_ \ / _ \ '__| | | / __|
- | |__|  __/ |   | |_) |  __/ |  | |_| \__ \
-  \____\___|_|   |_.__/ \___|_|   \__,_|___/
+ ____     ____    ____    ____     ____    ____    __  __  ____
+/\  _`\  /\  _`\ /\  _`\ /\  _`\  /\  _`\ /\  _`\ /\ \/\ \/\  _`\
+\ \ \/\_\\ \ \L\_\ \ \L\ \ \ \L\ \\ \ \L\_\ \ \L\ \ \ \ \ \ \,\L\_\
+ \ \ \/_/_\ \  _\L\ \ ,  /\ \  _ <'\ \  _\L\ \ ,  /\ \ \ \ \/_\__ \
+  \ \ \L\ \\ \ \L\ \ \ \\ \\ \ \L\ \\ \ \L\ \ \ \\ \\ \ \_\ \/\ \L\ \
+   \ \____/ \ \____/\ \_\ \_\ \____/ \ \____/\ \_\ \_\ \_____\ `\____\
+    \/___/   \/___/  \/_/\/ /\/___/   \/___/  \/_/\/ /\/_____/\/_____/
 """
 
 
 def _print_banner() -> None:
     style = "bold cyan" if _RICH else None
     if _RICH:
-        _console.print(BANNER, style=style)
+        _console.print(BANNER, style=style, highlight=False)
         _console.print(
             "  Dependency Vulnerability Gate -- created by Shankar Adhikary\n",
             style="dim",
