@@ -1,3 +1,3 @@
 """Dependency Vulnerability Gate - a minimal SCA (Software Composition Analysis) CLI."""
 
-__version__ = "1.2.0"
+__version__ = "1.2.1"
