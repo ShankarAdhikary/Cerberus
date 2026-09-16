@@ -45,7 +45,7 @@ pip install git+https://github.com/ShankarAdhikary/Cerberus.git@v1.0.0
 Alternatively, without installing the package at all:
 ```bash
 git clone https://github.com/ShankarAdhikary/Cerberus.git
-cd Cerberus/dep-vuln-gate
+cd Cerberus
 pip install -r requirements.txt
 python -m dep_gate.cli --file package-lock.json --fail-on high
 ```
