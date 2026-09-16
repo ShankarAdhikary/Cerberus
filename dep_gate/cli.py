@@ -79,12 +79,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--file",
         action="append",
         dest="files",
-        required=True,
+        required=False,
         metavar="PATH",
         help="Path to a package-lock.json, requirements.txt, go.sum, or Cargo.lock. "
         "Repeatable (--file a --file b) to scan multiple lockfiles in one invocation, "
         "producing one combined JSON/SARIF/SBOM/PR-comment output instead of one per "
-        "file. A single --file behaves exactly as before multi-file support existed.",
+        "file. A single --file behaves exactly as before multi-file support existed. "
+        "If omitted in an interactive terminal, you'll be prompted for a path instead.",
     )
     parser.add_argument(
         "--fail-on",
@@ -178,6 +179,22 @@ def build_arg_parser() -> argparse.ArgumentParser:
 def run(argv: list[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
     _print_banner()
+
+    if not args.files:
+        if not sys.stdin.isatty():
+            _print("Error: --file is required (no lockfile path given and no terminal to prompt on).")
+            return 2
+        prompt = "  Enter path to lockfile to scan (e.g. package-lock.json): "
+        if _RICH:
+            _console.print(prompt, end="", highlight=False)
+            raw = input()
+        else:
+            raw = input(prompt)
+        raw = raw.strip()
+        if not raw:
+            _print("Error: no file path entered.")
+            return 2
+        args.files = [part.strip() for part in raw.split(",") if part.strip()]
 
     pr_comment_token = os.environ.get("GITHUB_TOKEN", "")
     if args.pr_comment and (

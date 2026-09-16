@@ -74,10 +74,14 @@ same code path. Every example below uses the module form only because it
 also works without installing the package; swap in `dep-gate` freely.)
 
 Flags:
-- `--file PATH` — required, **repeatable**. Path to a lockfile
+- `--file PATH` — **repeatable**. Path to a lockfile
   (`package-lock.json`, `requirements.txt`, `go.sum`, `Cargo.lock`).
   Repeat it to scan several in one run; a single `--file` behaves exactly
-  as it always has.
+  as it always has. If omitted when run in an interactive terminal (e.g.
+  just typing `dep-gate`), you're prompted for a path instead — this is
+  purely a convenience for manual runs; a scripted/CI invocation with no
+  terminal to prompt on (and no `--file`) still exits `2` immediately
+  rather than hanging on input.
 - `--fail-on {low,moderate,high,critical}` — minimum severity that blocks the build.
 - `--json PATH` — also write a machine-readable report.
 - `--fail-open` — exit `0` instead of `1` if OSV.dev is unreachable (off by
