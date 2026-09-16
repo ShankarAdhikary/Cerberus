@@ -18,7 +18,7 @@ This module tries, in order:
 from __future__ import annotations
 
 import re
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 try:
     from cvss import CVSS2, CVSS3
@@ -62,7 +62,7 @@ def _score_from_vector(vector: str) -> float | None:
     return None
 
 
-def assess(vuln_record: dict) -> Severity:
+def assess(vuln_record: dict[str, Any]) -> Severity:
     """Derive the worst-case severity for a hydrated OSV vulnerability record."""
     best: Severity = Severity("UNKNOWN", None, "no severity data")
 
@@ -104,7 +104,7 @@ def _version_sort_key(version: str) -> tuple[tuple[int, object], ...]:
 
 
 def fixed_version(
-    vuln_record: dict,
+    vuln_record: dict[str, Any],
     ecosystem: str,
     package_name: str,
     installed_version: str | None = None,
