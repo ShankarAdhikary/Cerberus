@@ -825,7 +825,7 @@ def test_run_interactive_prompt_scans_the_entered_path(
     assert exit_code == 1
     out = capsys.readouterr().out
     assert "Enter path to lockfile to scan" in out
-    assert "SCAN FAILED" in out
+    assert "GATE BLOCKED" in out
 
 
 def test_run_interactive_prompt_plain_output_path(
@@ -843,7 +843,7 @@ def test_run_interactive_prompt_plain_output_path(
         exit_code = cli.run(["--fail-on", "high"])
 
     assert exit_code == 1
-    assert "SCAN FAILED" in capsys.readouterr().out
+    assert "GATE BLOCKED" in capsys.readouterr().out
 
 
 def test_run_interactive_prompt_splits_comma_separated_paths(
