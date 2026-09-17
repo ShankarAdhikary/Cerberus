@@ -374,10 +374,10 @@ def run(argv: list[str] | None = None) -> int:
             _print(f"Warning: failed to post PR comment: {exc}")
 
     if blocking:
-        _print(f"\nSCAN FAILED: {len(blocking)} finding(s) at or above '{args.fail_on}'.")
+        _print(f"\nGATE BLOCKED: {len(blocking)} finding(s) at or above '{args.fail_on}'.")
         return 1
 
-    _print("\nSCAN PASSED: no findings at or above the configured threshold.")
+    _print("\nGATE PASSED: no findings at or above the configured threshold.")
     return 0
 
 
