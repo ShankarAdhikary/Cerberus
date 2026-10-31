@@ -31,7 +31,9 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures" / "golden_single_file"
 HIGH_VULN_RECORD = {
     "id": "GHSA-high-0001",
     "summary": "A high severity issue",
-    "severity": [{"type": "CVSS_V3", "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"}],
+    "severity": [
+        {"type": "CVSS_V3", "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"}
+    ],
     "affected": [
         {
             "package": {"ecosystem": "npm", "name": "lodash"},
@@ -50,10 +52,15 @@ def test_single_file_json_sarif_sbom_are_byte_identical_to_pre_multi_file_output
     sarif_path = tmp_path / "report.sarif"
     sbom_path = tmp_path / "sbom.json"
 
-    with patch.object(
-        cli.osv_client, "batch_query", return_value={key: {"GHSA-high-0001"}}
-    ), patch.object(
-        cli.osv_client, "hydrate_vulns", return_value={"GHSA-high-0001": HIGH_VULN_RECORD}
+    with (
+        patch.object(
+            cli.osv_client, "batch_query", return_value={key: {"GHSA-high-0001"}}
+        ),
+        patch.object(
+            cli.osv_client,
+            "hydrate_vulns",
+            return_value={"GHSA-high-0001": HIGH_VULN_RECORD},
+        ),
     ):
         exit_code = cli.run(
             [
@@ -73,7 +80,9 @@ def test_single_file_json_sarif_sbom_are_byte_identical_to_pre_multi_file_output
     assert exit_code == 1
 
     actual_json = json.loads(json_path.read_text(encoding="utf-8"))
-    expected_json = json.loads((FIXTURES_DIR / "expected_report.json").read_text(encoding="utf-8"))
+    expected_json = json.loads(
+        (FIXTURES_DIR / "expected_report.json").read_text(encoding="utf-8")
+    )
     assert actual_json == expected_json  # exact match: no source_file field leaked in
 
     actual_sarif = json.loads(sarif_path.read_text(encoding="utf-8"))
@@ -84,11 +93,13 @@ def test_single_file_json_sarif_sbom_are_byte_identical_to_pre_multi_file_output
     # vs. wherever the golden file was originally captured from) - substitute
     # the placeholder with the real invocation path before comparing, since
     # that's the one field that was never meant to be literally identical.
-    expected_sarif["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"][
-        "uri"
-    ] = str(lockfile)
+    expected_sarif["runs"][0]["results"][0]["locations"][0]["physicalLocation"][
+        "artifactLocation"
+    ]["uri"] = str(lockfile)
     assert actual_sarif == expected_sarif
 
     actual_sbom = json.loads(sbom_path.read_text(encoding="utf-8"))
-    expected_sbom = json.loads((FIXTURES_DIR / "expected_sbom.json").read_text(encoding="utf-8"))
+    expected_sbom = json.loads(
+        (FIXTURES_DIR / "expected_sbom.json").read_text(encoding="utf-8")
+    )
     assert actual_sbom == expected_sbom

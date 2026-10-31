@@ -18,8 +18,12 @@ from dep_gate.severity import (
     fixed_version,
 )
 
-CVSS3_HIGH_VECTOR = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"  # base score 7.5 -> HIGH
-CVSS3_CRITICAL_VECTOR = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"  # base score 9.8 -> CRITICAL
+CVSS3_HIGH_VECTOR = (
+    "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"  # base score 7.5 -> HIGH
+)
+CVSS3_CRITICAL_VECTOR = (
+    "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"  # base score 9.8 -> CRITICAL
+)
 
 
 def test_assess_cvss_vector_only() -> None:
@@ -118,8 +122,12 @@ def test_assess_takes_worst_case_across_multiple_severity_entries() -> None:
 def test_level_from_score_covers_every_bucket() -> None:
     assert _level_from_score(9.8) == "CRITICAL"
     assert _level_from_score(7.5) == "HIGH"
-    assert _level_from_score(5.4) == "MODERATE"  # CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:L/A:N
-    assert _level_from_score(1.8) == "LOW"  # CVSS:3.1/AV:L/AC:H/PR:H/UI:R/S:U/C:L/I:N/A:N
+    assert (
+        _level_from_score(5.4) == "MODERATE"
+    )  # CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:L/A:N
+    assert (
+        _level_from_score(1.8) == "LOW"
+    )  # CVSS:3.1/AV:L/AC:H/PR:H/UI:R/S:U/C:L/I:N/A:N
     assert _level_from_score(0.0) == "UNKNOWN"
 
 
@@ -203,7 +211,9 @@ def test_fixed_version_natural_sort_handles_double_digit_minor() -> None:
 
 
 def test_fixed_version_returns_none_when_no_fix_published() -> None:
-    record = {"affected": [{"package": {"ecosystem": "npm", "name": "lodash"}, "ranges": []}]}
+    record = {
+        "affected": [{"package": {"ecosystem": "npm", "name": "lodash"}, "ranges": []}]
+    }
 
     result = fixed_version(record, "npm", "lodash")
 
@@ -281,7 +291,9 @@ def test_fixed_version_without_installed_version_keeps_prior_behavior() -> None:
     assert fixed_version(record, "npm", "lodash") == "4.17.19"
 
 
-def test_fixed_version_installed_version_predates_range_falls_back_to_all_fixes() -> None:
+def test_fixed_version_installed_version_predates_range_falls_back_to_all_fixes() -> (
+    None
+):
     # installed_version (1.0.0) is OLDER than this range's introduced bound
     # (2.0.0) - the vulnerability wasn't introduced yet at that version, so
     # it isn't "in range" for this range. With no range containing it,

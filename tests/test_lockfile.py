@@ -41,7 +41,9 @@ def test_parse_npm_v3_skips_root_and_link_entries(fixtures_dir: Path) -> None:
     assert "workspace-link" not in names
 
 
-def test_parse_npm_v2_prefers_packages_key_over_legacy_dependencies(fixtures_dir: Path) -> None:
+def test_parse_npm_v2_prefers_packages_key_over_legacy_dependencies(
+    fixtures_dir: Path,
+) -> None:
     deps = parse_npm_lockfile(str(fixtures_dir / "npm_v2" / "package-lock.json"))
 
     assert {"name": "requests-like", "version": "2.0.0", "ecosystem": "npm"} in deps
@@ -74,7 +76,9 @@ def test_parse_requirements_txt_pinned_lines(fixtures_dir: Path) -> None:
     assert {"name": "numpy", "version": "1.26.4", "ecosystem": "PyPI"} in deps
 
 
-def test_parse_requirements_txt_skips_unpinned_and_vcs_lines(fixtures_dir: Path) -> None:
+def test_parse_requirements_txt_skips_unpinned_and_vcs_lines(
+    fixtures_dir: Path,
+) -> None:
     deps = parse_requirements_txt(str(fixtures_dir / "requirements_mixed.txt"))
     names = [d["name"] for d in deps]
 
@@ -103,13 +107,23 @@ def test_parse_requirements_txt_dedupes(tmp_path: Path) -> None:
     assert deps == [{"name": "requests", "version": "2.28.0", "ecosystem": "PyPI"}]
 
 
-def test_parse_go_sum_collapses_content_and_go_mod_hash_lines(fixtures_dir: Path) -> None:
+def test_parse_go_sum_collapses_content_and_go_mod_hash_lines(
+    fixtures_dir: Path,
+) -> None:
     # Each module normally appears twice (content hash + "/go.mod" hash);
     # both rows share the same module@version and must collapse to one dep.
     deps = parse_go_sum(str(fixtures_dir / "go.sum"))
 
-    assert {"name": "github.com/BurntSushi/toml", "version": "v0.3.1", "ecosystem": "Go"} in deps
-    assert {"name": "github.com/pkg/errors", "version": "v0.9.1", "ecosystem": "Go"} in deps
+    assert {
+        "name": "github.com/BurntSushi/toml",
+        "version": "v0.3.1",
+        "ecosystem": "Go",
+    } in deps
+    assert {
+        "name": "github.com/pkg/errors",
+        "version": "v0.9.1",
+        "ecosystem": "Go",
+    } in deps
     assert len(deps) == 3
 
 
@@ -126,22 +140,26 @@ def test_parse_go_sum_includes_go_mod_only_modules(fixtures_dir: Path) -> None:
 
 def test_parse_go_sum_skips_malformed_lines(tmp_path: Path) -> None:
     go_sum = tmp_path / "go.sum"
-    go_sum.write_text("not a valid line\ngithub.com/pkg/errors v0.9.1 h1:abc=\n", encoding="utf-8")
-
-    deps = parse_go_sum(str(go_sum))
-
-    assert deps == [{"name": "github.com/pkg/errors", "version": "v0.9.1", "ecosystem": "Go"}]
-
-
-def test_parse_go_sum_skips_blank_lines(tmp_path: Path) -> None:
-    go_sum = tmp_path / "go.sum"
     go_sum.write_text(
-        "\ngithub.com/pkg/errors v0.9.1 h1:abc=\n\n\n", encoding="utf-8"
+        "not a valid line\ngithub.com/pkg/errors v0.9.1 h1:abc=\n", encoding="utf-8"
     )
 
     deps = parse_go_sum(str(go_sum))
 
-    assert deps == [{"name": "github.com/pkg/errors", "version": "v0.9.1", "ecosystem": "Go"}]
+    assert deps == [
+        {"name": "github.com/pkg/errors", "version": "v0.9.1", "ecosystem": "Go"}
+    ]
+
+
+def test_parse_go_sum_skips_blank_lines(tmp_path: Path) -> None:
+    go_sum = tmp_path / "go.sum"
+    go_sum.write_text("\ngithub.com/pkg/errors v0.9.1 h1:abc=\n\n\n", encoding="utf-8")
+
+    deps = parse_go_sum(str(go_sum))
+
+    assert deps == [
+        {"name": "github.com/pkg/errors", "version": "v0.9.1", "ecosystem": "Go"}
+    ]
 
 
 def test_parse_lockfile_dispatches_go_sum(fixtures_dir: Path) -> None:
@@ -155,7 +173,11 @@ def test_parse_cargo_lock_extracts_registry_packages(fixtures_dir: Path) -> None
     deps = parse_cargo_lock(str(fixtures_dir / "Cargo.lock"))
 
     assert {"name": "serde", "version": "1.0.195", "ecosystem": "crates.io"} in deps
-    assert {"name": "serde_derive", "version": "1.0.195", "ecosystem": "crates.io"} in deps
+    assert {
+        "name": "serde_derive",
+        "version": "1.0.195",
+        "ecosystem": "crates.io",
+    } in deps
 
 
 def test_parse_cargo_lock_skips_path_and_git_dependencies(fixtures_dir: Path) -> None:
@@ -225,7 +247,9 @@ def test_parse_gemfile_lock_extracts_resolved_gems(tmp_path: Path) -> None:
     ]
 
 
-def test_parse_composer_lock_includes_production_and_dev_packages(tmp_path: Path) -> None:
+def test_parse_composer_lock_includes_production_and_dev_packages(
+    tmp_path: Path,
+) -> None:
     lockfile = tmp_path / "composer.lock"
     lockfile.write_text(
         json.dumps(
@@ -244,7 +268,9 @@ def test_parse_composer_lock_includes_production_and_dev_packages(tmp_path: Path
 
 
 @pytest.mark.parametrize("filename", ["pom.xml", "Gemfile.lock", "composer.lock"])
-def test_parse_lockfile_dispatches_additional_ecosystems(tmp_path: Path, filename: str) -> None:
+def test_parse_lockfile_dispatches_additional_ecosystems(
+    tmp_path: Path, filename: str
+) -> None:
     path = tmp_path / filename
     if filename == "pom.xml":
         path.write_text("<project />", encoding="utf-8")

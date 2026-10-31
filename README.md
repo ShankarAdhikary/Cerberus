@@ -203,11 +203,15 @@ dependency in it is treated as new — not an error.
 ```bash
 pip install -r requirements-dev.txt
 python -m pytest
+ruff format --check .
+ruff check .
 ```
 
 The suite is fully network-free (the OSV.dev boundary is mocked in
 `tests/test_osv_client.py` and `tests/test_cli.py`); `tests/test_diff.py`
 spins up real temporary git repositories rather than mocking `git`.
+The same checks run in `.github/workflows/quality.yml`, which also validates
+package compilation and distribution metadata.
 
 ## CI integration
 
@@ -220,6 +224,9 @@ See `.github/workflows/security-scan.yml`. Two triggers:
   PR's findings as "new" relative to the last analysis on the default
   branch, so without this trigger a PR's SARIF upload silently never
   shows up as a visible alert, even though it succeeds.
+- **Scheduled scans** — the security scan runs daily, and quality checks run
+  weekly, so OSV/API or tooling drift is detected even when no lockfile
+  changes.
 
 ## Release status
 

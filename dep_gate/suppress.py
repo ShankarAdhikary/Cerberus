@@ -77,7 +77,9 @@ def load_suppressions(filepath: str) -> list[Suppression]:
             )
 
         if ":" not in stripped:
-            raise ValueError(f"Malformed {filepath}: expected 'key: value', got: {line!r}")
+            raise ValueError(
+                f"Malformed {filepath}: expected 'key: value', got: {line!r}"
+            )
 
         key, _, value = stripped.partition(":")
         current[key.strip()] = _strip_quotes(value.strip())
@@ -131,7 +133,7 @@ def find_active_suppression(
     the tool runs on a developer's laptop or a CI runner, and those can
     differ by a day right at the expiry boundary if tied to local time.
     """
-    today = today or datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+    today = today or datetime.datetime.now(datetime.UTC).date().isoformat()
     for suppression in suppressions:
         if suppression.vuln_id != vuln_id:
             continue

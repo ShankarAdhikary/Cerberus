@@ -47,7 +47,12 @@ def test_get_fresh_returns_record_within_ttl() -> None:
 
 def test_get_fresh_returns_none_past_ttl() -> None:
     now = time.time()
-    cache = {"GHSA-1": {"record": {"summary": "x"}, "cached_at": now - CACHE_TTL_SECONDS - 10}}
+    cache = {
+        "GHSA-1": {
+            "record": {"summary": "x"},
+            "cached_at": now - CACHE_TTL_SECONDS - 10,
+        }
+    }
 
     result = get_fresh(cache, "GHSA-1", now)
 

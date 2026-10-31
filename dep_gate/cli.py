@@ -81,7 +81,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         dest="files",
         required=False,
         metavar="PATH",
-        help=        "Path to package-lock.json, requirements.txt, go.sum, Cargo.lock, pom.xml, "
+        help="Path to package-lock.json, requirements.txt, go.sum, Cargo.lock, pom.xml, "
         "Gemfile.lock, or composer.lock. "
         "Repeatable (--file a --file b) to scan multiple lockfiles in one invocation, "
         "producing one combined JSON/SARIF/SBOM/PR-comment output instead of one per "
@@ -95,7 +95,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Minimum severity that fails the build (default: high)",
     )
     parser.add_argument(
-        "--json", metavar="PATH", help="Also write a machine-readable JSON report to PATH"
+        "--json",
+        metavar="PATH",
+        help="Also write a machine-readable JSON report to PATH",
     )
     parser.add_argument(
         "--sarif",
@@ -188,7 +190,9 @@ def run(argv: list[str] | None = None) -> int:
 
     if not args.files:
         if not sys.stdin.isatty():
-            _print("Error: --file is required (no lockfile path given and no terminal to prompt on).")
+            _print(
+                "Error: --file is required (no lockfile path given and no terminal to prompt on)."
+            )
             return 2
         prompt = "  Enter path to lockfile to scan (e.g. package-lock.json): "
         if _RICH:
@@ -332,7 +336,9 @@ def run(argv: list[str] | None = None) -> int:
             if args.verbose:
                 finding["source"] = sev.source
             if args.ignore_file:
-                match = suppress_module.find_active_suppression(vid, dep["name"], suppressions)
+                match = suppress_module.find_active_suppression(
+                    vid, dep["name"], suppressions
+                )
                 finding["suppressed"] = match is not None
                 finding["suppression_reason"] = match.reason if match else None
             findings.append(finding)
@@ -351,7 +357,9 @@ def run(argv: list[str] | None = None) -> int:
             json.dump(findings, f, indent=2)
 
     if args.sarif:
-        sarif_doc = sarif_module.build_sarif(findings, None if multi_file else args.files[0])
+        sarif_doc = sarif_module.build_sarif(
+            findings, None if multi_file else args.files[0]
+        )
         with open(args.sarif, "w", encoding="utf-8") as f:
             json.dump(sarif_doc, f, indent=2)
 
@@ -365,7 +373,9 @@ def run(argv: list[str] | None = None) -> int:
     ]
 
     if args.pr_comment:
-        scanned = [(file_path, len(file_deps)) for file_path, file_deps in per_file_deps]
+        scanned = [
+            (file_path, len(file_deps)) for file_path, file_deps in per_file_deps
+        ]
         body = github_client.render_pr_comment(
             blocking=blocking,
             scanned=scanned,
@@ -384,7 +394,9 @@ def run(argv: list[str] | None = None) -> int:
             _print(f"Warning: failed to post PR comment: {exc}")
 
     if blocking:
-        _print(f"\nGATE BLOCKED: {len(blocking)} finding(s) at or above '{args.fail_on}'.")
+        _print(
+            f"\nGATE BLOCKED: {len(blocking)} finding(s) at or above '{args.fail_on}'."
+        )
         return 1
 
     _print("\nGATE PASSED: no findings at or above the configured threshold.")
@@ -406,13 +418,17 @@ def _report(findings: list, verbose: bool = False, multi_file: bool = False) -> 
         if verbose:
             table.add_column("Source")
         for f in sorted(findings, key=lambda x: x["severity"], reverse=True):
-            severity_cell = f["severity"] + (" (suppressed)" if f.get("suppressed") else "")
+            severity_cell = f["severity"] + (
+                " (suppressed)" if f.get("suppressed") else ""
+            )
             row = [
                 f["package"],
                 f["version"],
                 severity_cell,
                 f["vuln_id"],
-                f"upgrade to {f['fixed_version']}" if f["fixed_version"] else "no fix yet",
+                f"upgrade to {f['fixed_version']}"
+                if f["fixed_version"]
+                else "no fix yet",
             ]
             if multi_file:
                 row.append(f.get("source_file", ""))
@@ -423,9 +439,13 @@ def _report(findings: list, verbose: bool = False, multi_file: bool = False) -> 
     else:
         for f in findings:
             fix_msg = (
-                f"upgrade to {f['fixed_version']}" if f["fixed_version"] else "no fix published yet"
+                f"upgrade to {f['fixed_version']}"
+                if f["fixed_version"]
+                else "no fix published yet"
             )
-            severity_text = f["severity"] + (" (suppressed)" if f.get("suppressed") else "")
+            severity_text = f["severity"] + (
+                " (suppressed)" if f.get("suppressed") else ""
+            )
             line = f"[{severity_text}] {f['package']}@{f['version']} - {f['vuln_id']} - {fix_msg}"
             if multi_file:
                 line += f" ({f.get('source_file', '')})"

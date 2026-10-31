@@ -57,22 +57,34 @@ def _request_with_retries(
         try:
             resp = session.request(method, url, timeout=REQUEST_TIMEOUT, **kwargs)
             if resp.status_code == 429 or resp.status_code >= 500:
-                raise requests.HTTPError(f"Retryable status {resp.status_code}", response=resp)
+                raise requests.HTTPError(
+                    f"Retryable status {resp.status_code}", response=resp
+                )
             resp.raise_for_status()
             return resp
         except (requests.ConnectionError, requests.Timeout, requests.HTTPError) as exc:
             last_exc = exc
-            retry_after = getattr(getattr(exc, "response", None), "headers", {}).get("Retry-After")
-            sleep_for = float(retry_after) if retry_after else BACKOFF_BASE * (2**attempt)
+            retry_after = getattr(getattr(exc, "response", None), "headers", {}).get(
+                "Retry-After"
+            )
+            sleep_for = (
+                float(retry_after) if retry_after else BACKOFF_BASE * (2**attempt)
+            )
             time.sleep(sleep_for)
-    raise RuntimeError(f"GitHub API request failed after {MAX_RETRIES} attempts: {last_exc}")
+    raise RuntimeError(
+        f"GitHub API request failed after {MAX_RETRIES} attempts: {last_exc}"
+    )
 
 
 def _findings_table(findings: list[dict[str, Any]]) -> list[str]:
     rows = ["| Severity | Package | Vuln ID | Fix |", "|---|---|---|---|"]
     for f in findings:
         emoji = _EMOJI_BY_SEVERITY.get(f["severity"], "")
-        fix = f"Upgrade to `{f['fixed_version']}`" if f.get("fixed_version") else "no fix yet"
+        fix = (
+            f"Upgrade to `{f['fixed_version']}`"
+            if f.get("fixed_version")
+            else "no fix yet"
+        )
         rows.append(
             f"| {emoji} {f['severity']} | `{f['package']}@{f['version']}` | "
             f"{f['vuln_id']} | {fix} |"
@@ -168,7 +180,11 @@ def find_existing_comment_id(
 
 
 def upsert_comment(
-    repo: str, pr_number: int, body: str, token: str, session: requests.Session | None = None
+    repo: str,
+    pr_number: int,
+    body: str,
+    token: str,
+    session: requests.Session | None = None,
 ) -> None:
     """Create the bot's findings comment on a PR, or update it in place if one already exists."""
     session = session or requests.Session()

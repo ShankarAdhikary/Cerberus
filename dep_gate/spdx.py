@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .lockfile import Dependency
 
@@ -37,7 +37,7 @@ def build_spdx(dependencies: list[Dependency]) -> dict:
         "name": "dep-gate-scan",
         "documentNamespace": "https://github.com/ShankarAdhikary/Cerberus/dep-gate",
         "creationInfo": {
-            "created": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "created": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "creators": ["Tool: dep-gate"],
         },
         "packages": packages,

@@ -88,7 +88,9 @@ def assess(vuln_record: dict[str, Any]) -> Severity:
                 normalized = raw.strip().upper()
                 if normalized == "MEDIUM":
                     normalized = "MODERATE"
-                if normalized in LEVELS and LEVELS.index(normalized) > LEVELS.index(best.level):
+                if normalized in LEVELS and LEVELS.index(normalized) > LEVELS.index(
+                    best.level
+                ):
                     best = Severity(normalized, None, "database_specific.severity")
 
     return best
@@ -132,7 +134,9 @@ def fixed_version(
     Returns the *lowest applicable* fixed version found, or None if no
     fix is published yet.
     """
-    installed_key = _version_sort_key(installed_version) if installed_version is not None else None
+    installed_key = (
+        _version_sort_key(installed_version) if installed_version is not None else None
+    )
 
     all_fixes: list[str] = []
     in_range_fixes: list[str] = []

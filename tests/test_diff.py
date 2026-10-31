@@ -46,7 +46,9 @@ def git_repo(tmp_path: Path) -> Path:
     _run_git(["add", LOCKFILE_NAME], repo)
     _run_git(["commit", "-m", "base"], repo)
 
-    lockfile.write_text(_npm_lockfile({"lodash": "4.17.19", "left-pad": "1.3.0"}), encoding="utf-8")
+    lockfile.write_text(
+        _npm_lockfile({"lodash": "4.17.19", "left-pad": "1.3.0"}), encoding="utf-8"
+    )
     _run_git(["add", LOCKFILE_NAME], repo)
     _run_git(["commit", "-m", "feature: bump lodash, add left-pad"], repo)
 
@@ -110,12 +112,16 @@ def test_diff_dependencies_excludes_untouched_deps(
     _run_git(["config", "user.name", "Test"], repo)
 
     lockfile = repo / LOCKFILE_NAME
-    lockfile.write_text(_npm_lockfile({"lodash": "4.17.15", "left-pad": "1.3.0"}), encoding="utf-8")
+    lockfile.write_text(
+        _npm_lockfile({"lodash": "4.17.15", "left-pad": "1.3.0"}), encoding="utf-8"
+    )
     _run_git(["add", LOCKFILE_NAME], repo)
     _run_git(["commit", "-m", "base"], repo)
 
     # Only lodash bumps; left-pad is untouched and must be excluded from the diff.
-    lockfile.write_text(_npm_lockfile({"lodash": "4.17.19", "left-pad": "1.3.0"}), encoding="utf-8")
+    lockfile.write_text(
+        _npm_lockfile({"lodash": "4.17.19", "left-pad": "1.3.0"}), encoding="utf-8"
+    )
     _run_git(["add", LOCKFILE_NAME], repo)
     _run_git(["commit", "-m", "bump lodash only"], repo)
 

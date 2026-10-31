@@ -37,7 +37,9 @@ def _patched_osv(batch_result: dict, hydrate_result: dict) -> Iterator[None]:
 HIGH_VULN_RECORD = {
     "id": "GHSA-high-0001",
     "summary": "A high severity issue",
-    "severity": [{"type": "CVSS_V3", "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"}],
+    "severity": [
+        {"type": "CVSS_V3", "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"}
+    ],
     "affected": [
         {
             "package": {"ecosystem": "npm", "name": "lodash"},
@@ -62,7 +64,9 @@ def _write_npm_lockfile(path: Path, deps: dict[str, str]) -> None:
     packages = {"": {"name": "sample", "version": "1.0.0"}}
     for name, version in deps.items():
         packages[f"node_modules/{name}"] = {"version": version}
-    path.write_text(json.dumps({"lockfileVersion": 3, "packages": packages}), encoding="utf-8")
+    path.write_text(
+        json.dumps({"lockfileVersion": 3, "packages": packages}), encoding="utf-8"
+    )
 
 
 @pytest.fixture
@@ -107,7 +111,9 @@ def test_run_finding_below_threshold_does_not_fail(lockfile: Path) -> None:
         ("critical", 0),
     ],
 )
-def test_run_threshold_boundaries(lockfile: Path, fail_on: str, expected_exit: int) -> None:
+def test_run_threshold_boundaries(
+    lockfile: Path, fail_on: str, expected_exit: int
+) -> None:
     key = "npm/lodash@4.17.15"
     with _patched_osv({key: {"GHSA-high-0001"}}, {"GHSA-high-0001": HIGH_VULN_RECORD}):
         exit_code = cli.run(["--file", str(lockfile), "--fail-on", fail_on])
@@ -124,14 +130,18 @@ def test_run_unknown_severity_never_blocks(lockfile: Path) -> None:
 
 
 def test_run_api_failure_default_fail_closed_exits_1(lockfile: Path) -> None:
-    with patch.object(cli.osv_client, "batch_query", side_effect=RuntimeError("OSV down")):
+    with patch.object(
+        cli.osv_client, "batch_query", side_effect=RuntimeError("OSV down")
+    ):
         exit_code = cli.run(["--file", str(lockfile)])
 
     assert exit_code == 1
 
 
 def test_run_api_failure_with_fail_open_exits_0(lockfile: Path) -> None:
-    with patch.object(cli.osv_client, "batch_query", side_effect=RuntimeError("OSV down")):
+    with patch.object(
+        cli.osv_client, "batch_query", side_effect=RuntimeError("OSV down")
+    ):
         exit_code = cli.run(["--file", str(lockfile), "--fail-open"])
 
     assert exit_code == 0
@@ -142,7 +152,9 @@ def test_run_hydrate_failure_also_respects_fail_open(lockfile: Path) -> None:
     batch_result = {key: {"GHSA-high-0001"}}
     with (
         patch.object(cli.osv_client, "batch_query", return_value=batch_result),
-        patch.object(cli.osv_client, "hydrate_vulns", side_effect=RuntimeError("OSV down")),
+        patch.object(
+            cli.osv_client, "hydrate_vulns", side_effect=RuntimeError("OSV down")
+        ),
     ):
         exit_code = cli.run(["--file", str(lockfile), "--fail-open"])
 
@@ -177,7 +189,9 @@ def test_run_unrecognized_file_type_exits_2(tmp_path: Path) -> None:
 
 def test_run_empty_lockfile_exits_0(tmp_path: Path) -> None:
     empty = tmp_path / "package-lock.json"
-    empty.write_text(json.dumps({"lockfileVersion": 3, "packages": {"": {}}}), encoding="utf-8")
+    empty.write_text(
+        json.dumps({"lockfileVersion": 3, "packages": {"": {}}}), encoding="utf-8"
+    )
 
     exit_code = cli.run(["--file", str(empty)])
 
@@ -285,7 +299,9 @@ def test_run_pr_comment_posting_failure_does_not_change_exit_code(
     key = "npm/lodash@4.17.15"
     with (
         _patched_osv({key: {"GHSA-high-0001"}}, {"GHSA-high-0001": HIGH_VULN_RECORD}),
-        patch.object(cli.github_client, "upsert_comment", side_effect=RuntimeError("boom")),
+        patch.object(
+            cli.github_client, "upsert_comment", side_effect=RuntimeError("boom")
+        ),
     ):
         exit_code = cli.run(
             [
@@ -315,10 +331,14 @@ def test_run_without_pr_comment_never_touches_github_client(lockfile: Path) -> N
     mock_upsert.assert_not_called()
 
 
-def test_run_cache_file_skips_fetching_fresh_cached_id(lockfile: Path, tmp_path: Path) -> None:
+def test_run_cache_file_skips_fetching_fresh_cached_id(
+    lockfile: Path, tmp_path: Path
+) -> None:
     cache_file = tmp_path / "cache.json"
     cache_file.write_text(
-        json.dumps({"GHSA-high-0001": {"record": HIGH_VULN_RECORD, "cached_at": time.time()}}),
+        json.dumps(
+            {"GHSA-high-0001": {"record": HIGH_VULN_RECORD, "cached_at": time.time()}}
+        ),
         encoding="utf-8",
     )
     key = "npm/lodash@4.17.15"
@@ -329,23 +349,41 @@ def test_run_cache_file_skips_fetching_fresh_cached_id(lockfile: Path, tmp_path:
         return {}
 
     with (
-        patch.object(cli.osv_client, "batch_query", return_value={key: {"GHSA-high-0001"}}),
+        patch.object(
+            cli.osv_client, "batch_query", return_value={key: {"GHSA-high-0001"}}
+        ),
         patch.object(cli.osv_client, "hydrate_vulns", side_effect=_fake_hydrate),
     ):
         exit_code = cli.run(
-            ["--file", str(lockfile), "--fail-on", "high", "--cache-file", str(cache_file)]
+            [
+                "--file",
+                str(lockfile),
+                "--fail-on",
+                "high",
+                "--cache-file",
+                str(cache_file),
+            ]
         )
 
     assert hydrate_calls == []  # fresh cache hit - no network call for this id at all
     assert exit_code == 1  # still correctly evaluated from the cached record
 
 
-def test_run_cache_file_fetches_uncached_id_and_persists_it(lockfile: Path, tmp_path: Path) -> None:
+def test_run_cache_file_fetches_uncached_id_and_persists_it(
+    lockfile: Path, tmp_path: Path
+) -> None:
     cache_file = tmp_path / "cache.json"
     key = "npm/lodash@4.17.15"
     with _patched_osv({key: {"GHSA-high-0001"}}, {"GHSA-high-0001": HIGH_VULN_RECORD}):
         exit_code = cli.run(
-            ["--file", str(lockfile), "--fail-on", "high", "--cache-file", str(cache_file)]
+            [
+                "--file",
+                str(lockfile),
+                "--fail-on",
+                "high",
+                "--cache-file",
+                str(cache_file),
+            ]
         )
 
     assert exit_code == 1
@@ -353,20 +391,33 @@ def test_run_cache_file_fetches_uncached_id_and_persists_it(lockfile: Path, tmp_
     assert saved["GHSA-high-0001"]["record"] == HIGH_VULN_RECORD
 
 
-def test_run_cache_file_expired_entry_is_refetched(lockfile: Path, tmp_path: Path) -> None:
+def test_run_cache_file_expired_entry_is_refetched(
+    lockfile: Path, tmp_path: Path
+) -> None:
     cache_file = tmp_path / "cache.json"
     stale_ts = time.time() - cli.cache_module.CACHE_TTL_SECONDS - 100
     cache_file.write_text(
-        json.dumps({"GHSA-high-0001": {"record": {"stale": True}, "cached_at": stale_ts}}),
+        json.dumps(
+            {"GHSA-high-0001": {"record": {"stale": True}, "cached_at": stale_ts}}
+        ),
         encoding="utf-8",
     )
     key = "npm/lodash@4.17.15"
     with _patched_osv({key: {"GHSA-high-0001"}}, {"GHSA-high-0001": HIGH_VULN_RECORD}):
         exit_code = cli.run(
-            ["--file", str(lockfile), "--fail-on", "high", "--cache-file", str(cache_file)]
+            [
+                "--file",
+                str(lockfile),
+                "--fail-on",
+                "high",
+                "--cache-file",
+                str(cache_file),
+            ]
         )
 
-    assert exit_code == 1  # used the freshly re-fetched record, not the stale cached one
+    assert (
+        exit_code == 1
+    )  # used the freshly re-fetched record, not the stale cached one
 
 
 def test_run_without_cache_file_behaves_as_before(lockfile: Path) -> None:
@@ -389,7 +440,9 @@ def test_run_writes_sarif_report(lockfile: Path, tmp_path: Path) -> None:
     result = sarif["runs"][0]["results"][0]
     assert result["ruleId"] == "GHSA-high-0001"
     assert result["level"] == "error"
-    assert result["locations"][0]["physicalLocation"]["artifactLocation"]["uri"] == str(lockfile)
+    assert result["locations"][0]["physicalLocation"]["artifactLocation"]["uri"] == str(
+        lockfile
+    )
 
 
 def test_run_sarif_not_written_on_usage_error(tmp_path: Path) -> None:
@@ -402,7 +455,9 @@ def test_run_sarif_not_written_on_usage_error(tmp_path: Path) -> None:
     assert not sarif_path.exists()
 
 
-def test_run_ignore_file_suppresses_matching_finding(lockfile: Path, tmp_path: Path) -> None:
+def test_run_ignore_file_suppresses_matching_finding(
+    lockfile: Path, tmp_path: Path
+) -> None:
     ignore_file = tmp_path / ".dep-gate-ignore.yml"
     ignore_file.write_text(
         "- vuln_id: GHSA-high-0001\n"
@@ -414,22 +469,40 @@ def test_run_ignore_file_suppresses_matching_finding(lockfile: Path, tmp_path: P
     key = "npm/lodash@4.17.15"
     with _patched_osv({key: {"GHSA-high-0001"}}, {"GHSA-high-0001": HIGH_VULN_RECORD}):
         exit_code = cli.run(
-            ["--file", str(lockfile), "--fail-on", "high", "--ignore-file", str(ignore_file)]
+            [
+                "--file",
+                str(lockfile),
+                "--fail-on",
+                "high",
+                "--ignore-file",
+                str(ignore_file),
+            ]
         )
 
     assert exit_code == 0
 
 
-def test_run_ignore_file_expired_entry_still_blocks(lockfile: Path, tmp_path: Path) -> None:
+def test_run_ignore_file_expired_entry_still_blocks(
+    lockfile: Path, tmp_path: Path
+) -> None:
     ignore_file = tmp_path / ".dep-gate-ignore.yml"
     ignore_file.write_text(
-        "- vuln_id: GHSA-high-0001\n" "  expires: 2000-01-01\n" '  reason: "expired long ago"\n',
+        "- vuln_id: GHSA-high-0001\n"
+        "  expires: 2000-01-01\n"
+        '  reason: "expired long ago"\n',
         encoding="utf-8",
     )
     key = "npm/lodash@4.17.15"
     with _patched_osv({key: {"GHSA-high-0001"}}, {"GHSA-high-0001": HIGH_VULN_RECORD}):
         exit_code = cli.run(
-            ["--file", str(lockfile), "--fail-on", "high", "--ignore-file", str(ignore_file)]
+            [
+                "--file",
+                str(lockfile),
+                "--fail-on",
+                "high",
+                "--ignore-file",
+                str(ignore_file),
+            ]
         )
 
     assert exit_code == 1
@@ -449,7 +522,14 @@ def test_run_ignore_file_package_scoped_does_not_suppress_other_package(
     key = "npm/lodash@4.17.15"
     with _patched_osv({key: {"GHSA-high-0001"}}, {"GHSA-high-0001": HIGH_VULN_RECORD}):
         exit_code = cli.run(
-            ["--file", str(lockfile), "--fail-on", "high", "--ignore-file", str(ignore_file)]
+            [
+                "--file",
+                str(lockfile),
+                "--fail-on",
+                "high",
+                "--ignore-file",
+                str(ignore_file),
+            ]
         )
 
     assert exit_code == 1
@@ -457,7 +537,9 @@ def test_run_ignore_file_package_scoped_does_not_suppress_other_package(
 
 def test_run_ignore_file_malformed_exits_2(lockfile: Path, tmp_path: Path) -> None:
     ignore_file = tmp_path / ".dep-gate-ignore.yml"
-    ignore_file.write_text("- vuln_id: GHSA-x\n", encoding="utf-8")  # missing expires/reason
+    ignore_file.write_text(
+        "- vuln_id: GHSA-x\n", encoding="utf-8"
+    )  # missing expires/reason
 
     exit_code = cli.run(["--file", str(lockfile), "--ignore-file", str(ignore_file)])
 
@@ -517,7 +599,9 @@ def test_run_sbom_not_written_on_usage_error(tmp_path: Path) -> None:
     assert not sbom_path.exists()
 
 
-def test_run_sbom_respects_diff_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_sbom_respects_diff_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
     _run_git(["init", "-b", "main"], repo)
@@ -627,7 +711,9 @@ def test_run_picks_fix_version_from_range_containing_installed_version(
     }
     key = "npm/lodash@4.17.15"
     report_path = tmp_path / "report.json"
-    with _patched_osv({key: {"GHSA-multi-0001"}}, {"GHSA-multi-0001": multi_range_record}):
+    with _patched_osv(
+        {key: {"GHSA-multi-0001"}}, {"GHSA-multi-0001": multi_range_record}
+    ):
         cli.run(["--file", str(lockfile), "--json", str(report_path)])
 
     report = json.loads(report_path.read_text(encoding="utf-8"))
@@ -680,7 +766,9 @@ def test_run_diff_only_scans_only_changed_deps(
         patch.object(cli.osv_client, "batch_query", side_effect=_fake_batch_query),
         patch.object(cli.osv_client, "hydrate_vulns", return_value={}),
     ):
-        exit_code = cli.run(["--file", "package-lock.json", "--diff-only", "--base-ref", "HEAD~1"])
+        exit_code = cli.run(
+            ["--file", "package-lock.json", "--diff-only", "--base-ref", "HEAD~1"]
+        )
 
     assert exit_code == 0
     assert [d["name"] for d in captured["deps"]] == ["left-pad"]
@@ -726,8 +814,12 @@ def test_run_diff_only_multi_file_prints_per_file_diff_message(
 
     assert exit_code == 0
     out = capsys.readouterr().out
-    assert "Diff mode: package-lock.json: 1 new/changed dependency(ies) vs HEAD~1." in out
-    assert "Diff mode: requirements.txt: 0 new/changed dependency(ies) vs HEAD~1." in out
+    assert (
+        "Diff mode: package-lock.json: 1 new/changed dependency(ies) vs HEAD~1." in out
+    )
+    assert (
+        "Diff mode: requirements.txt: 0 new/changed dependency(ies) vs HEAD~1." in out
+    )
 
 
 def test_run_diff_only_multi_file_git_error_prints_per_file_message(
@@ -777,7 +869,9 @@ def test_run_diff_only_outside_git_repo_exits_2(
 
     monkeypatch.setattr(subprocess, "run", _raise_not_found)
 
-    exit_code = cli.run(["--file", "package-lock.json", "--diff-only", "--base-ref", "HEAD~1"])
+    exit_code = cli.run(
+        ["--file", "package-lock.json", "--diff-only", "--base-ref", "HEAD~1"]
+    )
 
     assert exit_code == 2
 
@@ -905,6 +999,7 @@ def test_module_entrypoint_invokes_run_and_exits_with_its_code() -> None:
         cwd=str(Path(__file__).resolve().parents[1]),
         capture_output=True,
         text=True,
+        check=False,
     )
 
     assert result.returncode == 0

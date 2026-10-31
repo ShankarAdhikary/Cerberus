@@ -56,11 +56,16 @@ def _result(finding: dict, scanned_file: str | None) -> dict:
         "ruleId": finding["vuln_id"],
         "level": _LEVEL_BY_SEVERITY.get(finding["severity"], "note"),
         "message": {"text": message},
-        "locations": [{"physicalLocation": {"artifactLocation": {"uri": location_file}}}],
+        "locations": [
+            {"physicalLocation": {"artifactLocation": {"uri": location_file}}}
+        ],
     }
     if finding.get("suppressed"):
         result["suppressions"] = [
-            {"kind": "external", "justification": finding.get("suppression_reason") or ""}
+            {
+                "kind": "external",
+                "justification": finding.get("suppression_reason") or "",
+            }
         ]
     return result
 

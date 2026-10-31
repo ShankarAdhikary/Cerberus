@@ -48,14 +48,18 @@ def _request_with_retries(
         try:
             resp = session.request(method, url, timeout=REQUEST_TIMEOUT, **kwargs)
             if resp.status_code == 429 or resp.status_code >= 500:
-                raise requests.HTTPError(f"Retryable status {resp.status_code}", response=resp)
+                raise requests.HTTPError(
+                    f"Retryable status {resp.status_code}", response=resp
+                )
             resp.raise_for_status()
             return resp
         except (requests.ConnectionError, requests.Timeout, requests.HTTPError) as exc:
             last_exc = exc
             sleep_for = BACKOFF_BASE * (2**attempt)
             time.sleep(sleep_for)
-    raise RuntimeError(f"OSV API request failed after {MAX_RETRIES} attempts: {last_exc}")
+    raise RuntimeError(
+        f"OSV API request failed after {MAX_RETRIES} attempts: {last_exc}"
+    )
 
 
 def batch_query(

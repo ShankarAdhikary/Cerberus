@@ -76,7 +76,9 @@ def test_render_pr_comment_passed_scan_has_no_findings_table_row() -> None:
 
 
 def test_render_pr_comment_never_includes_raw_cvss_vector() -> None:
-    finding = dict(BLOCKING_FINDING, cvss_vector="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H")
+    finding = dict(
+        BLOCKING_FINDING, cvss_vector="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+    )
     body = render_pr_comment(
         blocking=[finding],
         scanned=[("package-lock.json", 1)],
@@ -116,7 +118,11 @@ def test_render_pr_comment_no_fix_shown_as_no_fix_yet() -> None:
 def test_find_existing_comment_id_returns_match() -> None:
     session = MagicMock(spec=requests.Session)
     session.request.return_value = _fake_response(
-        200, [{"id": 111, "body": "unrelated"}, {"id": 222, "body": f"{COMMENT_MARKER}\nhi"}]
+        200,
+        [
+            {"id": 111, "body": "unrelated"},
+            {"id": 222, "body": f"{COMMENT_MARKER}\nhi"},
+        ],
     )
 
     result = find_existing_comment_id("owner/repo", 5, "tok", session=session)
@@ -129,7 +135,9 @@ def test_find_existing_comment_id_returns_match() -> None:
 
 def test_find_existing_comment_id_returns_none_when_absent() -> None:
     session = MagicMock(spec=requests.Session)
-    session.request.return_value = _fake_response(200, [{"id": 111, "body": "unrelated"}])
+    session.request.return_value = _fake_response(
+        200, [{"id": 111, "body": "unrelated"}]
+    )
 
     result = find_existing_comment_id("owner/repo", 5, "tok", session=session)
 
@@ -152,7 +160,9 @@ def test_upsert_comment_creates_when_no_existing_comment() -> None:
 def test_upsert_comment_updates_existing_comment() -> None:
     session = MagicMock(spec=requests.Session)
     session.request.side_effect = [
-        _fake_response(200, [{"id": 42, "body": COMMENT_MARKER}]),  # GET (find existing)
+        _fake_response(
+            200, [{"id": 42, "body": COMMENT_MARKER}]
+        ),  # GET (find existing)
         _fake_response(200, {"id": 42}),  # PATCH (update)
     ]
 
@@ -176,7 +186,9 @@ def test_upsert_comment_raises_after_retries_exhausted_on_persistent_500(
         upsert_comment("owner/repo", 5, "body text", "tok", session=session)
 
 
-def test_request_with_retries_retries_on_429_then_succeeds(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_request_with_retries_retries_on_429_then_succeeds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr("dep_gate.github_client.time.sleep", lambda _: None)
     session = MagicMock(spec=requests.Session)
     session.request.side_effect = [
@@ -190,9 +202,13 @@ def test_request_with_retries_retries_on_429_then_succeeds(monkeypatch: pytest.M
     assert session.request.call_count == 3
 
 
-def test_request_with_retries_respects_retry_after_header(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_request_with_retries_respects_retry_after_header(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     sleep_calls = []
-    monkeypatch.setattr("dep_gate.github_client.time.sleep", lambda s: sleep_calls.append(s))
+    monkeypatch.setattr(
+        "dep_gate.github_client.time.sleep", lambda s: sleep_calls.append(s)
+    )
     session = MagicMock(spec=requests.Session)
     session.request.side_effect = [
         _fake_response(200, []),  # GET (find existing)
@@ -205,7 +221,9 @@ def test_request_with_retries_respects_retry_after_header(monkeypatch: pytest.Mo
     assert 7.0 in sleep_calls
 
 
-def test_request_with_retries_retries_on_connection_error(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_request_with_retries_retries_on_connection_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr("dep_gate.github_client.time.sleep", lambda _: None)
     session = MagicMock(spec=requests.Session)
     session.request.side_effect = [
@@ -219,7 +237,9 @@ def test_request_with_retries_retries_on_connection_error(monkeypatch: pytest.Mo
     assert session.request.call_count == 3
 
 
-def test_request_with_retries_never_fires_without_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_request_with_retries_never_fires_without_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr("dep_gate.github_client.time.sleep", lambda _: None)
     session = MagicMock(spec=requests.Session)
     session.request.return_value = _fake_response(200, [])

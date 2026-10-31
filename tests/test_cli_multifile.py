@@ -19,7 +19,9 @@ from dep_gate import cli
 NPM_HIGH_RECORD = {
     "id": "GHSA-npm-0001",
     "summary": "An npm issue",
-    "severity": [{"type": "CVSS_V3", "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"}],
+    "severity": [
+        {"type": "CVSS_V3", "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"}
+    ],
     "affected": [
         {
             "package": {"ecosystem": "npm", "name": "lodash"},
@@ -71,9 +73,9 @@ def _mocked_osv():
         "PyPI/requests@2.6.0": {"GHSA-pypi-0001"},
     }
     hydrated = {"GHSA-npm-0001": NPM_HIGH_RECORD, "GHSA-pypi-0001": PYPI_HIGH_RECORD}
-    return patch.object(cli.osv_client, "batch_query", return_value=matches), patch.object(
-        cli.osv_client, "hydrate_vulns", return_value=hydrated
-    )
+    return patch.object(
+        cli.osv_client, "batch_query", return_value=matches
+    ), patch.object(cli.osv_client, "hydrate_vulns", return_value=hydrated)
 
 
 def test_build_arg_parser_file_is_repeatable() -> None:
@@ -154,9 +156,11 @@ def test_run_multi_file_pr_comment_shows_both_files_without_overwrite(
     monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
     batch_patch, hydrate_patch = _mocked_osv()
 
-    with batch_patch, hydrate_patch, patch.object(
-        cli.github_client, "upsert_comment"
-    ) as mock_upsert:
+    with (
+        batch_patch,
+        hydrate_patch,
+        patch.object(cli.github_client, "upsert_comment") as mock_upsert,
+    ):
         cli.run(
             [
                 "--file",
@@ -203,10 +207,13 @@ def test_run_multi_file_exit_1_if_only_one_file_has_blocking_finding(
     }
     hydrated = {"GHSA-npm-0001": NPM_HIGH_RECORD, "GHSA-pypi-0001": low_pypi_record}
 
-    with patch.object(cli.osv_client, "batch_query", return_value=matches), patch.object(
-        cli.osv_client, "hydrate_vulns", return_value=hydrated
+    with (
+        patch.object(cli.osv_client, "batch_query", return_value=matches),
+        patch.object(cli.osv_client, "hydrate_vulns", return_value=hydrated),
     ):
-        exit_code = cli.run(["--file", str(npm_file), "--file", str(py_file), "--fail-on", "high"])
+        exit_code = cli.run(
+            ["--file", str(npm_file), "--file", str(py_file), "--fail-on", "high"]
+        )
 
     assert exit_code == 1
 
@@ -216,10 +223,13 @@ def test_run_multi_file_exit_0_if_no_file_has_blocking_finding(
 ) -> None:
     npm_file, py_file = two_lockfiles
 
-    with patch.object(cli.osv_client, "batch_query", return_value={}), patch.object(
-        cli.osv_client, "hydrate_vulns", return_value={}
+    with (
+        patch.object(cli.osv_client, "batch_query", return_value={}),
+        patch.object(cli.osv_client, "hydrate_vulns", return_value={}),
     ):
-        exit_code = cli.run(["--file", str(npm_file), "--file", str(py_file), "--fail-on", "high"])
+        exit_code = cli.run(
+            ["--file", str(npm_file), "--file", str(py_file), "--fail-on", "high"]
+        )
 
     assert exit_code == 0
 
@@ -252,7 +262,9 @@ def test_run_multi_file_second_file_error_message_names_that_file(
 
 
 def test_run_multi_file_plain_output_tags_each_line_with_source_file(
-    two_lockfiles: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    two_lockfiles: tuple[Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture,
 ) -> None:
     # Non-rich (plain print) fallback path, multi-file case: each finding
     # line must be tagged with the file it came from, same as the rich

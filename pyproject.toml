@@ -30,7 +30,7 @@ classifiers = [
 Repository = "https://github.com/ShankarAdhikary/Cerberus"
 
 [project.optional-dependencies]
-dev = ["pytest==9.1.1", "build==1.6.1", "twine==7.0.0"]
+dev = ["pytest==9.1.1", "build==1.6.1", "twine==7.0.0", "ruff==0.14.4"]
 
 [project.scripts]
 dep-gate = "dep_gate.cli:run"

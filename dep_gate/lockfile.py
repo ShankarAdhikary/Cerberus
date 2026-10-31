@@ -12,11 +12,10 @@ from __future__ import annotations
 
 import json
 import re
+import tomllib
 from pathlib import Path
 from typing import TypedDict
 from xml.etree import ElementTree
-
-import tomllib
 
 
 class Dependency(TypedDict):
@@ -172,7 +171,11 @@ def parse_gemfile_lock(filepath: str) -> list[Dependency]:
         match = re.match(r"^    ([A-Za-z0-9_.-]+) \(([^)]+)\)$", raw_line)
         if match:
             deps.append(
-                {"name": match.group(1), "version": match.group(2), "ecosystem": "RubyGems"}
+                {
+                    "name": match.group(1),
+                    "version": match.group(2),
+                    "ecosystem": "RubyGems",
+                }
             )
     return _dedupe(deps)
 
@@ -186,7 +189,9 @@ def parse_composer_lock(filepath: str) -> list[Dependency]:
             name = package.get("name")
             version = package.get("version")
             if name and version:
-                deps.append({"name": name, "version": version, "ecosystem": "Packagist"})
+                deps.append(
+                    {"name": name, "version": version, "ecosystem": "Packagist"}
+                )
     return _dedupe(deps)
 
 

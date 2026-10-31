@@ -55,7 +55,9 @@ def get_base_dependencies(filepath: str, base_ref: str) -> list[Dependency]:
         # all - must surface as GitDiffError, never a silent empty diff.
         if "does not exist in" in stderr or "exists on disk, but not in" in stderr:
             return []
-        raise GitDiffError(f"git show failed for {base_ref}:{filepath}: {stderr.strip()}")
+        raise GitDiffError(
+            f"git show failed for {base_ref}:{filepath}: {stderr.strip()}"
+        )
 
     # parse_lockfile dispatches on filename, so write the old content to a
     # temp file with the same basename rather than reimplementing dispatch.
