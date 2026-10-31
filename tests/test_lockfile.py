@@ -8,14 +8,18 @@ requirements.txt with pinned/unpinned/comment/VCS lines.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
 
 from dep_gate.lockfile import (
     parse_cargo_lock,
+    parse_composer_lock,
+    parse_gemfile_lock,
     parse_go_sum,
     parse_lockfile,
+    parse_maven_pom,
     parse_npm_lockfile,
     parse_requirements_txt,
 )
@@ -189,6 +193,67 @@ def test_parse_lockfile_dispatches_on_filename(fixtures_dir: Path) -> None:
 
     assert all(d["ecosystem"] == "npm" for d in npm_deps)
     assert all(d["ecosystem"] == "PyPI" for d in txt_deps)
+
+
+def test_parse_maven_pom_extracts_versioned_dependencies(tmp_path: Path) -> None:
+    pom = tmp_path / "pom.xml"
+    pom.write_text(
+        """<project xmlns="http://maven.apache.org/POM/4.0.0">
+        <dependencies>
+          <dependency><groupId>org.example</groupId><artifactId>safe</artifactId><version>1.2.3</version></dependency>
+          <dependency><groupId>org.example</groupId><artifactId>managed</artifactId><version>${managed.version}</version></dependency>
+        </dependencies>
+        </project>""",
+        encoding="utf-8",
+    )
+
+    assert parse_maven_pom(str(pom)) == [
+        {"name": "org.example:safe", "version": "1.2.3", "ecosystem": "Maven"}
+    ]
+
+
+def test_parse_gemfile_lock_extracts_resolved_gems(tmp_path: Path) -> None:
+    lockfile = tmp_path / "Gemfile.lock"
+    lockfile.write_text(
+        "GEM\n  specs:\n    rack (3.0.8)\n    rails (7.1.2)\n      rack (~> 3.0)\n\nPLATFORMS\n",
+        encoding="utf-8",
+    )
+
+    assert parse_gemfile_lock(str(lockfile)) == [
+        {"name": "rack", "version": "3.0.8", "ecosystem": "RubyGems"},
+        {"name": "rails", "version": "7.1.2", "ecosystem": "RubyGems"},
+    ]
+
+
+def test_parse_composer_lock_includes_production_and_dev_packages(tmp_path: Path) -> None:
+    lockfile = tmp_path / "composer.lock"
+    lockfile.write_text(
+        json.dumps(
+            {
+                "packages": [{"name": "vendor/app", "version": "1.0.0"}],
+                "packages-dev": [{"name": "vendor/test", "version": "2.0.0"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert parse_composer_lock(str(lockfile)) == [
+        {"name": "vendor/app", "version": "1.0.0", "ecosystem": "Packagist"},
+        {"name": "vendor/test", "version": "2.0.0", "ecosystem": "Packagist"},
+    ]
+
+
+@pytest.mark.parametrize("filename", ["pom.xml", "Gemfile.lock", "composer.lock"])
+def test_parse_lockfile_dispatches_additional_ecosystems(tmp_path: Path, filename: str) -> None:
+    path = tmp_path / filename
+    if filename == "pom.xml":
+        path.write_text("<project />", encoding="utf-8")
+    elif filename == "Gemfile.lock":
+        path.write_text("", encoding="utf-8")
+    else:
+        path.write_text("{}", encoding="utf-8")
+
+    assert parse_lockfile(str(path)) == []
 
 
 def test_parse_lockfile_unrecognized_extension_raises(tmp_path: Path) -> None:

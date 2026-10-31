@@ -32,9 +32,9 @@ Note the PyPI/`pip install` name is `cerberus-sca`, not `cerberus` or
 `dep-gate` — `dep-gate` was too similar to an existing, unrelated PyPI
 package for PyPI's own upload validator to accept, and the project's own
 name, `cerberus`, is already taken by a different, unrelated PyPI package
-(see `docs/Tracker.md` and `docs/TechSpec.md` §5 for the full naming
-history). The **console command** is `dep-gate` (short, what you
-actually type) regardless of which name you `pip install`.
+(a schema/data-validation library, unrelated to this tool). The
+**console command** is `dep-gate` (short, what you actually type)
+regardless of which name you `pip install`.
 
 Also installable from a tagged release without PyPI at all (equally
 verified):
@@ -75,7 +75,8 @@ also works without installing the package; swap in `dep-gate` freely.)
 
 Flags:
 - `--file PATH` — **repeatable**. Path to a lockfile
-  (`package-lock.json`, `requirements.txt`, `go.sum`, `Cargo.lock`).
+  (`package-lock.json`, `requirements.txt`, `go.sum`, `Cargo.lock`,
+  `pom.xml`, `Gemfile.lock`, `composer.lock`).
   Repeat it to scan several in one run; a single `--file` behaves exactly
   as it always has. If omitted when run in an interactive terminal (e.g.
   just typing `dep-gate`), you're prompted for a path instead — this is
@@ -104,6 +105,7 @@ Flags:
 - `--sarif PATH` — also write a SARIF 2.1.0 report for GitHub
   code-scanning upload (`github/codeql-action/upload-sarif`). Same
   findings as `--json`, different shape.
+- `--spdx PATH` — write an SPDX 2.3 JSON Software Bill of Materials.
 - `--cache-file PATH` — reuse a local JSON cache of hydrated OSV records
   across runs, skipping re-fetches for a vuln ID already fetched within
   the last 6 hours. Off by default. Persist the file across CI runs
@@ -130,9 +132,9 @@ Flags:
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-This is exactly what `security-scan.yml` below does: one combined
+This is exactly what `.github/workflows/security-scan.yml` does: one combined
 invocation across every lockfile present, so `--pr-comment` posts a
-single comment covering all of them (grouped by file — see Design.md §4)
+single comment covering all of them (grouped by file)
 instead of one ecosystem's `--pr-comment` call finding-and-overwriting
 another's. (An earlier version of this project ran one `dep_gate.cli`
 invocation per ecosystem, which made `--pr-comment` impossible to wire in
@@ -192,6 +194,9 @@ dependency in it is treated as new — not an error.
 - `Cargo.lock` (Rust — only registry (crates.io) packages are checked;
   path/workspace and git dependencies are skipped, since they aren't
   published to crates.io and have no OSV-resolvable version)
+- `pom.xml` (Maven direct dependencies with explicit versions)
+- `Gemfile.lock` (RubyGems resolved specs)
+- `composer.lock` (Packagist production and development packages)
 
 ## Testing
 
@@ -216,12 +221,22 @@ See `.github/workflows/security-scan.yml`. Two triggers:
   branch, so without this trigger a PR's SARIF upload silently never
   shows up as a visible alert, even though it succeeds.
 
+## Release status
+
+The latest published package/tag is `1.0.0`. The current source tree carries
+the next development version in `dep_gate/__init__.py`; releases are built
+and published by `.github/workflows/release.yml` when a `v*` tag is pushed.
+The workflow uses PyPI trusted publishing, so no long-lived PyPI token is
+stored in GitHub secrets.
+
 ## Known limitations / good next steps
 
-- Four ecosystems supported (`npm`, `PyPI`, `Go`, `crates.io`). OSV also
-  covers Maven, RubyGems, Packagist, etc. — the same batch/hydrate client
-  works for those, you'd just need lockfile parsers for each.
-- SPDX SBOM format not supported (CycloneDX is).
+- Maven, RubyGems, and Packagist support is intentionally limited to
+  lockfile entries with concrete versions. Maven properties and unresolved
+  dependency-management versions are skipped.
+- SPDX and CycloneDX JSON SBOM formats are supported. Neither format
+  fabricates dependency relationships because the parsers expose a flat
+  resolved inventory.
 
 ## License
 

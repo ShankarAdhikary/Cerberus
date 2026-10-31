@@ -140,7 +140,7 @@ def test_get_base_dependencies_missing_git_binary_raises_git_diff_error(
 def test_get_base_dependencies_outside_git_repo_raises_git_diff_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Regression test: TechSpec.md §4 requires a git command failure (not a
+    # Regression test: a git command failure (not a
     # repo, unresolvable ref, shallow clone) to surface as GitDiffError, not
     # be silently treated the same as "file legitimately absent at that ref".
     non_repo = tmp_path / "not-a-repo"

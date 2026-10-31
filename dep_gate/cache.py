@@ -5,7 +5,7 @@ repeatedly against the same repo doesn't re-fetch a record it already
 has fresh.
 
 Why TTL instead of OSV's `modified` timestamp: `batch_query()`'s response
-does carry a per-result `modified` field (see Schema.md §5.1), which
+does carry a per-result `modified` field, which
 could in principle drive exact staleness checks - but wiring that through
 would change `batch_query()`'s documented, already-tested return shape
 (`Dict[str, set[str]]`) into something structurally different, for a

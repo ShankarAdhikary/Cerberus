@@ -1,6 +1,6 @@
 """
 Tests for dep_gate.suppress — pure parsing/matching logic (no network).
-Covers PRD.md's requirement that suppressions be auditable, not silent:
+Covers the requirement that suppressions be auditable, not silent:
 every entry must carry an expiry date and a justification, and an expired
 entry must stop suppressing (not be silently treated as still active).
 """

@@ -2,16 +2,15 @@
 GitHub API client for the opt-in `--pr-comment` feature: posts/updates a
 single idempotent PR comment summarizing blocking findings.
 
-This is the tool's SECOND network egress point, after osv_client.py - see
-PRD.md's zero-telemetry NFR, which scopes any egress beyond api.osv.dev to
+This is the tool's SECOND network egress point, after osv_client.py. The
+tool's zero-telemetry policy scopes any egress beyond api.osv.dev to
 "the GitHub API for PR comments the user explicitly enables". It must
 never be called unless the user passed --pr-comment; cli.py enforces
 that, not this module.
 
 Auth model: the workflow's own GITHUB_TOKEN with job-scoped
-`permissions: pull-requests: write`, not a GitHub App - see Tracker.md's
-"Resolved decisions" for the rationale (this is a single-repo PR-gate
-tool; a GitHub App adds infrastructure PRD.md's NFRs explicitly reject).
+`permissions: pull-requests: write`, not a GitHub App. This is a single-repo
+PR-gate tool and does not need the infrastructure of a GitHub App.
 """
 
 from __future__ import annotations
@@ -27,7 +26,7 @@ MAX_RETRIES = 3
 BACKOFF_BASE = 1.0  # seconds, doubles-ish each retry
 
 # Marks our own comment so upsert_comment() can find and update it on a
-# re-run instead of posting a new comment every push - Design.md §4's
+# re-run instead of posting a new comment every push -
 # idempotency rule.
 COMMENT_MARKER = "<!-- dep-gate-pr-comment -->"
 
@@ -89,7 +88,7 @@ def render_pr_comment(
     base_ref: str | None,
 ) -> str:
     """
-    Render the Markdown PR comment body per Design.md §4. Pure function,
+    Render the Markdown PR comment body. Pure function,
     no I/O - shows only *blocking* findings above the fold (not every
     LOW/UNKNOWN finding), and never includes a raw CVSS vector string,
     per that same design rule.

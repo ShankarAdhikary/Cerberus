@@ -14,6 +14,7 @@ import json
 import re
 from pathlib import Path
 from typing import TypedDict
+from xml.etree import ElementTree
 
 import tomllib
 
@@ -131,6 +132,64 @@ def parse_cargo_lock(filepath: str) -> list[Dependency]:
     return _dedupe(deps)
 
 
+def parse_maven_pom(filepath: str) -> list[Dependency]:
+    """Parse direct versioned dependencies from a Maven ``pom.xml``."""
+    root = ElementTree.parse(filepath).getroot()
+    deps: list[Dependency] = []
+    for dependency in root.iter():
+        if dependency.tag.rsplit("}", 1)[-1] != "dependency":
+            continue
+        values = {
+            child.tag.rsplit("}", 1)[-1]: (child.text or "").strip()
+            for child in dependency
+        }
+        group_id = values.get("groupId")
+        artifact_id = values.get("artifactId")
+        version = values.get("version")
+        if group_id and artifact_id and version and not version.startswith("${"):
+            deps.append(
+                {
+                    "name": f"{group_id}:{artifact_id}",
+                    "version": version,
+                    "ecosystem": "Maven",
+                }
+            )
+    return _dedupe(deps)
+
+
+def parse_gemfile_lock(filepath: str) -> list[Dependency]:
+    """Parse the resolved ``GEM`` specs section of a Ruby Gemfile.lock."""
+    deps: list[Dependency] = []
+    in_specs = False
+    for raw_line in Path(filepath).read_text(encoding="utf-8").splitlines():
+        if raw_line == "  specs:":
+            in_specs = True
+            continue
+        if in_specs and raw_line and not raw_line.startswith(" "):
+            in_specs = False
+        if not in_specs:
+            continue
+        match = re.match(r"^    ([A-Za-z0-9_.-]+) \(([^)]+)\)$", raw_line)
+        if match:
+            deps.append(
+                {"name": match.group(1), "version": match.group(2), "ecosystem": "RubyGems"}
+            )
+    return _dedupe(deps)
+
+
+def parse_composer_lock(filepath: str) -> list[Dependency]:
+    """Parse resolved packages from a Composer ``composer.lock`` file."""
+    data = json.loads(Path(filepath).read_text(encoding="utf-8"))
+    deps: list[Dependency] = []
+    for section in ("packages", "packages-dev"):
+        for package in data.get(section, []):
+            name = package.get("name")
+            version = package.get("version")
+            if name and version:
+                deps.append({"name": name, "version": version, "ecosystem": "Packagist"})
+    return _dedupe(deps)
+
+
 _GO_MOD_SUFFIX = "/go.mod"
 
 
@@ -183,9 +242,16 @@ def parse_lockfile(filepath: str) -> list[Dependency]:
         return parse_go_sum(filepath)
     if name == "cargo.lock":
         return parse_cargo_lock(filepath)
+    if name == "pom.xml":
+        return parse_maven_pom(filepath)
+    if name == "gemfile.lock":
+        return parse_gemfile_lock(filepath)
+    if name == "composer.lock":
+        return parse_composer_lock(filepath)
     if name.endswith(".txt"):
         return parse_requirements_txt(filepath)
     raise ValueError(
         f"Unrecognized lockfile type for '{filepath}'. "
-        "Supported: package-lock.json, requirements.txt, go.sum, Cargo.lock"
+        "Supported: package-lock.json, requirements.txt, go.sum, Cargo.lock, "
+        "pom.xml, Gemfile.lock, composer.lock"
     )

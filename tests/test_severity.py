@@ -1,6 +1,6 @@
 """
 Tests for dep_gate.severity — pure, I/O-free functions, highest coverage
-bar per Rules.md. Covers the precedence order from Schema.md §5.2: a
+bar. Covers the precedence order:
 parseable CVSS vector always wins over database_specific.severity, and
 absence of both degrades to UNKNOWN rather than raising.
 """
@@ -42,6 +42,12 @@ def test_assess_database_specific_only() -> None:
     }
 
     result = assess(record)
+
+    assert result == Severity("HIGH", None, "database_specific.severity")
+
+
+def test_assess_top_level_database_specific_only() -> None:
+    result = assess({"database_specific": {"severity": "HIGH"}})
 
     assert result == Severity("HIGH", None, "database_specific.severity")
 

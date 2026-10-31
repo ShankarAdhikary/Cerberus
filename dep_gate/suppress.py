@@ -1,6 +1,6 @@
 """
 Suppression-file support (`.dep-gate-ignore.yml`) for accepted-risk
-exceptions, per PRD.md's V1 auditability requirement: a suppression must
+exceptions: a suppression must
 never be silent. Every entry requires an expiry date and a justification
 string, and an expired entry stops suppressing automatically rather than
 staying silently active forever.

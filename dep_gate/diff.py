@@ -51,7 +51,7 @@ def get_base_dependencies(filepath: str, base_ref: str) -> list[Dependency]:
         # Only a path that's genuinely absent at a *resolvable* ref (new
         # lockfile) is "zero prior dependencies", not an error. Any other
         # failure - an unresolvable ref (bad --base-ref, or a shallow clone
-        # missing history per TechSpec.md §4) or not being in a git repo at
+        # missing history or not being in a git repo at
         # all - must surface as GitDiffError, never a silent empty diff.
         if "does not exist in" in stderr or "exists on disk, but not in" in stderr:
             return []

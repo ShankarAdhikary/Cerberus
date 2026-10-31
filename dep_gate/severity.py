@@ -57,7 +57,7 @@ def _score_from_vector(vector: str) -> float | None:
     except Exception:  # noqa: BLE001 - the cvss package raises varied/undocumented
         # exception types on a malformed vector; any parse failure degrades to
         # None (falls through to the database_specific fallback), never raises -
-        # see AppFlow.md §3's malformed-CVSS-vector row.
+        # malformed vectors fall through to advisory severity.
         return None
     return None
 
@@ -78,8 +78,12 @@ def assess(vuln_record: dict[str, Any]) -> Severity:
     # 3: database_specific.severity text rating (common on GHSA advisories),
     #    used only if we didn't already get a numeric CVSS score above.
     if best.score is None:
-        for affected in vuln_record.get("affected", []):
-            raw = affected.get("database_specific", {}).get("severity")
+        raw_severities = [vuln_record.get("database_specific", {}).get("severity")]
+        raw_severities.extend(
+            affected.get("database_specific", {}).get("severity")
+            for affected in vuln_record.get("affected", [])
+        )
+        for raw in raw_severities:
             if isinstance(raw, str):
                 normalized = raw.strip().upper()
                 if normalized == "MEDIUM":

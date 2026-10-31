@@ -6,7 +6,7 @@ Usage:
     python -m dep_gate.cli --file requirements.txt --fail-on critical --json report.json
 
     # Multiple lockfiles in one invocation - one combined report/PR comment,
-    # not one per file (see TechSpec.md §2.10 for why --file is repeatable):
+    # not one per file:
     python -m dep_gate.cli --file package-lock.json --file requirements.txt --fail-on high
 """
 
@@ -23,6 +23,7 @@ from . import diff as diff_module
 from . import github_client, lockfile, osv_client, severity
 from . import sarif as sarif_module
 from . import sbom as sbom_module
+from . import spdx as spdx_module
 from . import suppress as suppress_module
 
 THRESHOLD_ORDER = ["low", "moderate", "high", "critical"]
@@ -80,7 +81,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
         dest="files",
         required=False,
         metavar="PATH",
-        help="Path to a package-lock.json, requirements.txt, go.sum, or Cargo.lock. "
+        help=        "Path to package-lock.json, requirements.txt, go.sum, Cargo.lock, pom.xml, "
+        "Gemfile.lock, or composer.lock. "
         "Repeatable (--file a --file b) to scan multiple lockfiles in one invocation, "
         "producing one combined JSON/SARIF/SBOM/PR-comment output instead of one per "
         "file. A single --file behaves exactly as before multi-file support existed. "
@@ -107,6 +109,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Also write a CycloneDX JSON Software Bill of Materials to PATH, listing "
         "every dependency that was scanned (respects --diff-only). Independent of "
         "vulnerability findings - written even on a clean scan.",
+    )
+    parser.add_argument(
+        "--spdx",
+        metavar="PATH",
+        help="Also write an SPDX 2.3 Software Bill of Materials to PATH.",
     )
     parser.add_argument(
         "--fail-open",
@@ -156,8 +163,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--pr-comment",
         action="store_true",
         help="Post/update an idempotent PR comment summarizing blocking findings, via the "
-        "GitHub API. Off by default - this is the tool's second network egress point (see "
-        "PRD.md's zero-telemetry NFR). Requires --github-repo, --github-pr-number, and a "
+        "GitHub API. Off by default - this is the tool's second network egress point. "
+        "Requires --github-repo, --github-pr-number, and a "
         "GITHUB_TOKEN environment variable (never passed as a CLI argument, to keep it out "
         "of process listings/CI logs).",
     )
@@ -209,7 +216,7 @@ def run(argv: list[str] | None = None) -> int:
 
     # Resolve every file's dependency list up front, failing fast on the
     # FIRST usage error rather than partially scanning some files and
-    # reporting on others - AppFlow.md §2's exit-code contract requires
+    # reporting on others - the exit-code contract requires
     # exit 2 the moment any one file can't be read, not a partial result.
     per_file_deps: list[tuple[str, list]] = []
     for file_path in args.files:
@@ -256,6 +263,9 @@ def run(argv: list[str] | None = None) -> int:
     if args.sbom:
         with open(args.sbom, "w", encoding="utf-8") as f:
             json.dump(sbom_module.build_sbom(deps), f, indent=2)
+    if args.spdx:
+        with open(args.spdx, "w", encoding="utf-8") as f:
+            json.dump(spdx_module.build_spdx(deps), f, indent=2)
 
     if not deps:
         _print("No dependencies found to scan.")
@@ -370,7 +380,7 @@ def run(argv: list[str] | None = None) -> int:
         except Exception as exc:  # noqa: BLE001
             # Deliberately broad: a comment-posting failure (network error, bad
             # token, rate limit, ...) must never change the scan's own pass/fail
-            # result - see AppFlow.md §4's "additive output, not a replacement" rule.
+            # result: comment output is additive, not a replacement for the gate.
             _print(f"Warning: failed to post PR comment: {exc}")
 
     if blocking:

@@ -3,7 +3,7 @@ End-to-end tests for dep_gate.cli.run() — the OSV client boundary
 (osv_client.batch_query / hydrate_vulns) is mocked via unittest.mock.patch,
 but parsing, diffing, severity assessment, and exit-code logic all run for
 real. Asserts the exact exit codes (0/1/2) for every scenario in
-AppFlow.md §3.
+the CLI contract.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ from dep_gate import cli
 
 @contextmanager
 def _patched_osv(batch_result: dict, hydrate_result: dict) -> Iterator[None]:
-    """Patch the osv_client boundary only, per TechSpec.md's network-boundary rule."""
+    """Patch only the OSV network boundary."""
     with (
         patch.object(cli.osv_client, "batch_query", return_value=batch_result),
         patch.object(cli.osv_client, "hydrate_vulns", return_value=hydrate_result),

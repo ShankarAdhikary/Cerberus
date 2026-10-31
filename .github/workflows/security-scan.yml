@@ -7,6 +7,9 @@ on:
       - "requirements.txt"
       - "go.sum"
       - "Cargo.lock"
+      - "pom.xml"
+      - "Gemfile.lock"
+      - "composer.lock"
   push:
     branches: [main]
     paths:
@@ -14,6 +17,9 @@ on:
       - "requirements.txt"
       - "go.sum"
       - "Cargo.lock"
+      - "pom.xml"
+      - "Gemfile.lock"
+      - "composer.lock"
     # A push-to-main run scans the WHOLE lockfile (no --diff-only - there's
     # no PR base ref on a push event) and is what GitHub's code-scanning
     # alerts need as a baseline: PR runs only ever report findings as "new"
@@ -62,15 +68,15 @@ jobs:
             dep-gate-osv-cache-
 
       # One combined invocation across every lockfile present, not one
-      # step per ecosystem - --file is repeatable (see TechSpec.md §2.10),
+      # step per ecosystem - --file is repeatable,
       # and this is what makes --pr-comment usable at all here: separate
       # per-ecosystem invocations would each find-and-overwrite the same
       # idempotent PR comment, so the final comment would only ever
       # reflect whichever ecosystem's step happened to run last, silently
       # dropping findings from the others (this was a known, documented
-      # gap - see Tracker.md - until multi-file support existed).
+      # gap until multi-file support existed).
       - name: Scan lockfiles (new/changed deps only)
-        if: hashFiles('package-lock.json', 'requirements.txt', 'go.sum', 'Cargo.lock') != ''
+        if: hashFiles('package-lock.json', 'requirements.txt', 'go.sum', 'Cargo.lock', 'pom.xml', 'Gemfile.lock', 'composer.lock') != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -79,6 +85,9 @@ jobs:
           [ -f requirements.txt ] && FILES+=(--file requirements.txt)
           [ -f go.sum ] && FILES+=(--file go.sum)
           [ -f Cargo.lock ] && FILES+=(--file Cargo.lock)
+          [ -f pom.xml ] && FILES+=(--file pom.xml)
+          [ -f Gemfile.lock ] && FILES+=(--file Gemfile.lock)
+          [ -f composer.lock ] && FILES+=(--file composer.lock)
           python -m dep_gate.cli \
             "${FILES[@]}" \
             --fail-on high \

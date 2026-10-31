@@ -1,6 +1,6 @@
 """
 Backward-compatibility regression test for multi-file `--file` support
-(Rules.md point 7 of the multi-file task): a single `--file X` invocation
+(The multi-file compatibility contract): a single `--file X` invocation
 must produce byte-identical JSON/SARIF/SBOM output to before multi-file
 support existed.
 
