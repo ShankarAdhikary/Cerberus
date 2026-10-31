@@ -36,10 +36,9 @@ name, `cerberus`, is already taken by a different, unrelated PyPI package
 **console command** is `dep-gate` (short, what you actually type)
 regardless of which name you `pip install`.
 
-Also installable from a tagged release without PyPI at all (equally
-verified):
+Also installable from a tagged release without PyPI at all:
 ```bash
-pip install git+https://github.com/ShankarAdhikary/Cerberus.git@v1.0.0
+pip install git+https://github.com/ShankarAdhikary/Cerberus.git@v1.2.2
 ```
 
 Alternatively, without installing the package at all:
@@ -53,7 +52,7 @@ python -m dep_gate.cli --file package-lock.json --fail-on high
 **In another repo's own CI**, pin to a released version rather than a
 moving target:
 ```yaml
-- run: pip install cerberus-sca==1.0.0
+- run: pip install cerberus-sca==1.2.2
 - run: dep-gate --file package-lock.json --fail-on high
 ```
 
@@ -245,7 +244,7 @@ See `.github/workflows/security-scan.yml`. Two triggers:
 
 ## Release status
 
-The current source version is `1.2.1`. PyPI currently contains `1.0.0`.
+The current source version is `1.2.2`. PyPI contains `1.2.1`.
 Releases are built and published by `.github/workflows/release.yml` when a
 matching `v*` tag is pushed. The workflow verifies that the tag version and
 package version match before publishing.
@@ -257,14 +256,15 @@ publisher on PyPI for the `cerberus-sca` project:
 - PyPI owner: `ShankarAdhikary`
 - GitHub repository: `Cerberus`
 - Workflow filename: `.github/workflows/release.yml`
-- GitHub environment: `pypi`
+- GitHub environment: leave blank
 
-The GitHub environment must be named exactly `pypi`. After that one-time
+The workflow deliberately does not use a GitHub environment, so configure the
+publisher without an environment restriction. After that one-time
 configuration, publish a version with:
 
 ```bash
-git tag v1.2.1
-git push origin v1.2.1
+git tag v1.2.2
+git push origin v1.2.2
 ```
 
 The release workflow uploads the wheel and source distribution to PyPI. The
