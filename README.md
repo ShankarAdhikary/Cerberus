@@ -244,7 +244,7 @@ See `.github/workflows/security-scan.yml`. Two triggers:
 
 ## Release status
 
-The current source version is `1.2.2`. PyPI contains `1.2.1`.
+The current source version is `1.2.2`. PyPI contains `1.2.2`.
 Releases are built and published by `.github/workflows/release.yml` when a
 matching `v*` tag is pushed. The workflow verifies that the tag version and
 package version match before publishing.
