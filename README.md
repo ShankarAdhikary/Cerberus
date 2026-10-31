@@ -245,11 +245,31 @@ See `.github/workflows/security-scan.yml`. Two triggers:
 
 ## Release status
 
-The latest published package/tag is `1.0.0`. The current source tree carries
-the next development version in `dep_gate/__init__.py`; releases are built
-and published by `.github/workflows/release.yml` when a `v*` tag is pushed.
+The current source version is `1.2.1`. PyPI currently contains `1.0.0`.
+Releases are built and published by `.github/workflows/release.yml` when a
+matching `v*` tag is pushed. The workflow verifies that the tag version and
+package version match before publishing.
+
 The workflow uses PyPI trusted publishing, so no long-lived PyPI token is
-stored in GitHub secrets.
+stored in GitHub secrets. Before the first release, configure this pending
+publisher on PyPI for the `cerberus-sca` project:
+
+- PyPI owner: `ShankarAdhikary`
+- GitHub repository: `Cerberus`
+- Workflow filename: `.github/workflows/release.yml`
+- GitHub environment: `pypi`
+
+The GitHub environment must be named exactly `pypi`. After that one-time
+configuration, publish a version with:
+
+```bash
+git tag v1.2.1
+git push origin v1.2.1
+```
+
+The release workflow uploads the wheel and source distribution to PyPI. The
+same version cannot be uploaded twice, so increment `dep_gate/__init__.py`
+for every later release.
 
 ## Known limitations / good next steps
 
