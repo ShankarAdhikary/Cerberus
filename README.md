@@ -89,7 +89,9 @@ Flags:
   rather than hanging on input.
 - `--project PATH` — scan a local project directory or `.zip` archive.
   Supported lockfiles are discovered recursively while generated directories
-  such as `.git`, `node_modules`, and virtual environments are ignored.
+  such as `.git`, `.venv`, `venv`, `node_modules`, and `__pycache__` are
+  ignored. Other nested directories, including test fixtures, are scanned
+  intentionally so the command inventories the complete project.
   It cannot be combined with `--file`. The project ZIP is extracted to a
   temporary directory and removed after lockfile parsing.
 - `--fail-on {low,moderate,high,critical}` — minimum severity that blocks the build.
@@ -126,6 +128,10 @@ Flags:
   `GITHUB_TOKEN` environment variable (the workflow's own token — never
   pass it as a CLI argument). A comment-posting failure prints a warning
   but never changes the exit code.
+
+Project and ZIP inputs are local-only. The scanner does not download arbitrary
+URLs or execute project code. GitHub repository import is not part of the
+current release.
 
 ```yaml
 # in a pull_request-triggered job, with:

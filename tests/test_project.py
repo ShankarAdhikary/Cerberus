@@ -44,3 +44,16 @@ def test_prepare_project_input_rejects_zip_path_traversal(tmp_path: Path) -> Non
 
     with pytest.raises(ValueError, match="Unsafe ZIP entry"):
         prepare_project_input(source)
+
+
+def test_prepare_project_input_rejects_invalid_zip(tmp_path: Path) -> None:
+    source = tmp_path / "invalid.zip"
+    source.write_text("not a zip archive", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Unable to read project ZIP"):
+        prepare_project_input(source)
+
+
+def test_prepare_project_input_rejects_empty_project(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="Project path must be a directory"):
+        prepare_project_input(tmp_path / "missing-project")
