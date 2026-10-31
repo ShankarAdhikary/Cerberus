@@ -63,6 +63,10 @@ moving target:
 dep-gate --file package-lock.json --fail-on high
 dep-gate --file requirements.txt --fail-on critical --json report.json
 
+# Scan every supported lockfile inside a local folder or ZIP archive.
+dep-gate --project ./my-project --fail-on high
+dep-gate --project ./my-project.zip --fail-on high --json report.json
+
 # --file is repeatable: scan multiple lockfiles in one invocation, with
 # one combined JSON/SARIF/SBOM/PR-comment output instead of one per file.
 dep-gate --file package-lock.json --file requirements.txt --fail-on high
@@ -83,6 +87,11 @@ Flags:
   purely a convenience for manual runs; a scripted/CI invocation with no
   terminal to prompt on (and no `--file`) still exits `2` immediately
   rather than hanging on input.
+- `--project PATH` — scan a local project directory or `.zip` archive.
+  Supported lockfiles are discovered recursively while generated directories
+  such as `.git`, `node_modules`, and virtual environments are ignored.
+  It cannot be combined with `--file`. The project ZIP is extracted to a
+  temporary directory and removed after lockfile parsing.
 - `--fail-on {low,moderate,high,critical}` — minimum severity that blocks the build.
 - `--json PATH` — also write a machine-readable report.
 - `--fail-open` — exit `0` instead of `1` if OSV.dev is unreachable (off by

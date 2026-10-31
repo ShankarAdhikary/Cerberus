@@ -21,6 +21,7 @@ import time
 from . import cache as cache_module
 from . import diff as diff_module
 from . import github_client, lockfile, osv_client, severity
+from . import project as project_module
 from . import sarif as sarif_module
 from . import sbom as sbom_module
 from . import spdx as spdx_module
@@ -87,6 +88,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "producing one combined JSON/SARIF/SBOM/PR-comment output instead of one per "
         "file. A single --file behaves exactly as before multi-file support existed. "
         "If omitted in an interactive terminal, you'll be prompted for a path instead.",
+    )
+    parser.add_argument(
+        "--project",
+        metavar="PATH",
+        help="Scan a local project directory or .zip archive. Supported lockfiles "
+        "are discovered recursively; cannot be combined with --file.",
     )
     parser.add_argument(
         "--fail-on",
@@ -188,6 +195,23 @@ def run(argv: list[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
     _print_banner()
 
+    project_cleanup = None
+    if args.project and args.files:
+        _print("Error: --project cannot be combined with --file.")
+        return 2
+    if args.project:
+        try:
+            args.files, project_cleanup = project_module.prepare_project_input(
+                args.project
+            )
+        except (OSError, ValueError) as exc:
+            _print(f"Error reading project: {exc}")
+            return 2
+        if not args.files:
+            project_module.cleanup_project_input(project_cleanup)
+            _print("Error: no supported lockfiles found in the project.")
+            return 2
+
     if not args.files:
         if not sys.stdin.isatty():
             _print(
@@ -223,36 +247,39 @@ def run(argv: list[str] | None = None) -> int:
     # reporting on others - the exit-code contract requires
     # exit 2 the moment any one file can't be read, not a partial result.
     per_file_deps: list[tuple[str, list]] = []
-    for file_path in args.files:
-        try:
-            if args.diff_only:
-                file_deps = diff_module.diff_dependencies(file_path, args.base_ref)
-                if multi_file:
-                    _print(
-                        f"Diff mode: {file_path}: {len(file_deps)} new/changed "
-                        f"dependency(ies) vs {args.base_ref}."
-                    )
+    try:
+        for file_path in args.files:
+            try:
+                if args.diff_only:
+                    file_deps = diff_module.diff_dependencies(file_path, args.base_ref)
+                    if multi_file:
+                        _print(
+                            f"Diff mode: {file_path}: {len(file_deps)} new/changed "
+                            f"dependency(ies) vs {args.base_ref}."
+                        )
+                    else:
+                        _print(
+                            f"Diff mode: {len(file_deps)} new/changed dependency(ies) "
+                            f"vs {args.base_ref}."
+                        )
                 else:
-                    _print(
-                        f"Diff mode: {len(file_deps)} new/changed dependency(ies) "
-                        f"vs {args.base_ref}."
-                    )
-            else:
-                file_deps = lockfile.parse_lockfile(file_path)
-        except (FileNotFoundError, ValueError) as exc:
-            _print(f"Error reading {file_path}: {exc}")
-            return 2
-        except diff_module.GitDiffError as exc:
-            if multi_file:
-                _print(f"Error computing diff for {file_path}: {exc}")
-            else:
-                _print(f"Error computing diff: {exc}")
-            return 2
+                    file_deps = lockfile.parse_lockfile(file_path)
+            except (FileNotFoundError, ValueError) as exc:
+                _print(f"Error reading {file_path}: {exc}")
+                return 2
+            except diff_module.GitDiffError as exc:
+                if multi_file:
+                    _print(f"Error computing diff for {file_path}: {exc}")
+                else:
+                    _print(f"Error computing diff: {exc}")
+                return 2
 
-        if multi_file:
-            for dep in file_deps:
-                dep["source_file"] = file_path
-        per_file_deps.append((file_path, file_deps))
+            if multi_file:
+                for dep in file_deps:
+                    dep["source_file"] = file_path
+            per_file_deps.append((file_path, file_deps))
+    finally:
+        project_module.cleanup_project_input(project_cleanup)
 
     deps = [dep for _file_path, file_deps in per_file_deps for dep in file_deps]
 
